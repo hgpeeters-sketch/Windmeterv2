@@ -38,14 +38,14 @@ export default function PreStartView({ wind, samples, speedBuckets }) {
         padding: '0 16px', flexShrink: 0,
       }}>
         <span style={{
-          fontSize: 'min(5vh, 10vw)', fontWeight: 700,
+          fontSize: 18, fontWeight: 700,
           fontFamily: 'monospace', letterSpacing: '0.2em',
-          color: `rgba(${RGB(0)},0.5)`,
+          color: `rgba(${RGB(0)},0.5)`, whiteSpace: 'nowrap',
         }}>PRE-START</span>
         <span style={{
-          fontSize: 'min(5vh, 10vw)', fontWeight: 700,
+          fontSize: 22, fontWeight: 700,
           fontFamily: 'monospace', color: FG(0),
-          fontVariantNumeric: 'tabular-nums',
+          fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
         }}>{time}</span>
       </div>
 
@@ -60,14 +60,14 @@ export default function PreStartView({ wind, samples, speedBuckets }) {
         {/* Big number centred */}
         <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', paddingLeft: 12 }}>
           <span style={{
-            fontSize: 'min(18vh, 42vw)', fontWeight: 700,
+            fontSize: 'min(12vh, 22vw)', fontWeight: 700,
             fontFamily: 'monospace', color: FG(1), lineHeight: 1,
           }}>{wind.direction}°</span>
         </div>
         {/* Compass label bottom-right */}
         <span style={{
           position: 'absolute', bottom: 10, right: 16,
-          fontSize: 'min(5vh, 10vw)', fontFamily: 'monospace',
+          fontSize: 'min(3.5vh, 7vw)', fontFamily: 'monospace',
           color: `rgba(${RGB(1)},0.4)`,
         }}>{compassLabel(wind.direction)}</span>
       </div>
@@ -107,14 +107,14 @@ export default function PreStartView({ wind, samples, speedBuckets }) {
         {/* Big number */}
         <div style={{ height: '100%', display: 'flex', alignItems: 'center', paddingLeft: 12 }}>
           <span style={{
-            fontSize: 'min(18vh, 42vw)', fontWeight: 700,
+            fontSize: 'min(12vh, 22vw)', fontWeight: 700,
             fontFamily: 'monospace', color: FG(3), lineHeight: 1,
           }}>{spd}</span>
         </div>
         {/* Unit bottom-right */}
         <span style={{
           position: 'absolute', bottom: 10, right: 16,
-          fontSize: 'min(5vh, 10vw)', fontFamily: 'monospace',
+          fontSize: 'min(3.5vh, 7vw)', fontFamily: 'monospace',
           color: `rgba(${RGB(3)},0.4)`,
         }}>{unit}</span>
       </div>
