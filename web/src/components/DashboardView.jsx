@@ -184,6 +184,10 @@ function RollTile({ roll, onRequestPerms }) {
   )
 }
 
+// EMA smoothing + clamp for roll — isolates heel from dynamic boat motion
+const ROLL_ALPHA = 0.18
+const ROLL_CLAMP = 45
+
 export default function DashboardView() {
   const [cog, setCog]           = useState(null)
   const [cogHistory, setCogHistory] = useState([])
@@ -191,6 +195,16 @@ export default function DashboardView() {
   const [time, setTime]         = useState('')
   const [gpsError, setGpsError] = useState(null)
   const lastSample              = useRef(0)
+  const rollSmoothed            = useRef(null)
+
+  function applyRoll(gamma) {
+    const clamped  = Math.max(-ROLL_CLAMP, Math.min(ROLL_CLAMP, gamma))
+    const smoothed = rollSmoothed.current === null
+      ? clamped
+      : rollSmoothed.current + ROLL_ALPHA * (clamped - rollSmoothed.current)
+    rollSmoothed.current = smoothed
+    setRoll(parseFloat(smoothed.toFixed(1)))
+  }
 
   // Clock
   useEffect(() => {
@@ -216,12 +230,12 @@ export default function DashboardView() {
     return () => navigator.geolocation.clearWatch(id)
   }, [])
 
-  // Device orientation → Roll (gamma)
+  // Device orientation → Roll (gamma = left/right heel in portrait)
   useEffect(() => {
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission !== 'function') {
       window.addEventListener('deviceorientation', e => {
-        if (e.gamma !== null) setRoll(e.gamma)
+        if (e.gamma !== null) applyRoll(e.gamma)
       })
     }
   }, [])
@@ -230,7 +244,7 @@ export default function DashboardView() {
     if (typeof DeviceOrientationEvent?.requestPermission === 'function') {
       DeviceOrientationEvent.requestPermission().then(s => {
         if (s === 'granted') window.addEventListener('deviceorientation', e => {
-          if (e.gamma !== null) setRoll(e.gamma)
+          if (e.gamma !== null) applyRoll(e.gamma)
         })
       })
     }

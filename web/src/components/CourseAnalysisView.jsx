@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { circularMean } from '../useWindData'
 
 // Angular difference: how far TWD is from mark bearing
 // Positive = wind right of mark (lifted on starboard)
@@ -168,7 +169,9 @@ function fitFontSize(text, W, H, weight = '900') {
 }
 
 export default function CourseAnalysisView({ wind, samples }) {
-  const [mark, setMark] = useState(() => parseInt(localStorage.getItem('markBearing') || '0'))
+  const stored = localStorage.getItem('markBearing')
+  const [mark, setMark] = useState(stored !== null ? parseInt(stored) : Math.round(wind.direction))
+  const markDefaulted = useRef(stored !== null)
   const [time, setTime] = useState('')
   const markContainerRef = useRef(null)
   const [markFs, setMarkFs] = useState(80)
@@ -177,6 +180,18 @@ export default function CourseAnalysisView({ wind, samples }) {
     const tick = () => setTime(new Date().toTimeString().slice(0, 8))
     tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
   }, [])
+
+  // Keep mark tracking TWD average until user manually adjusts it
+  useEffect(() => {
+    if (markDefaulted.current) return
+    if (samples.length >= 3) {
+      const m = Math.round(circularMean(samples.map(s => s.direction)))
+      setMark(m)
+      markDefaulted.current = true
+    } else {
+      setMark(Math.round(wind.direction))
+    }
+  }, [samples, wind.direction])
 
   const markText = `${String(mark).padStart(3, '0')}°`
   useEffect(() => {
@@ -190,6 +205,7 @@ export default function CourseAnalysisView({ wind, samples }) {
   }, [markText])
 
   function changeMark(delta) {
+    markDefaulted.current = true
     setMark(m => {
       const v = ((m + delta) % 360 + 360) % 360
       localStorage.setItem('markBearing', v)
@@ -228,8 +244,8 @@ export default function CourseAnalysisView({ wind, samples }) {
         <button onPointerDown={() => changeMark(+1)} style={{ height: '100%', width: 56, background: 'transparent', border: 'none', borderLeft: `1px solid rgba(${RGB(1)},0.15)`, fontSize: 32, fontWeight: 300, color: `rgba(${RGB(1)},0.5)`, cursor: 'pointer', flexShrink: 0 }}>+</button>
       </div>
 
-      {/* Row 2: Live wind vs mark — dark, flex 1.5 */}
-      <div style={{ flex: 1.5, minHeight: 0, background: BG(2), display: 'flex', alignItems: 'center', padding: '0 14px', gap: 0 }}>
+      {/* Row 2: Live wind vs mark — dark, flex 2.5 */}
+      <div style={{ flex: 2.5, minHeight: 0, background: BG(2), display: 'flex', alignItems: 'center', padding: '0 14px', gap: 0 }}>
         <Cell label="TWD" value={`${wind.direction}°`} light />
         <Divider />
         <Cell label="SHIFT" value={`${current >= 0 ? '+' : ''}${current.toFixed(1)}°`} light />
@@ -247,8 +263,8 @@ export default function CourseAnalysisView({ wind, samples }) {
         </div>
       </div>
 
-      {/* Row 4: Recommendation — light, flex 2 */}
-      <div style={{ flex: 2, minHeight: 0, background: BG(3), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '10px 14px' }}>
+      {/* Row 4: Recommendation — light, flex 1.5 */}
+      <div style={{ flex: 1.5, minHeight: 0, background: BG(3), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '10px 14px' }}>
         {result ? (
           <>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
