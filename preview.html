@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>WindMeter – Preview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #080C14;
+    color: #fff;
+    font-family: 'SF Mono', 'Courier New', monospace;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+  }
+
+  .phone {
+    width: 390px;
+    min-height: 844px;
+    background: #080C14;
+    display: flex;
+    flex-direction: column;
+    padding: 0 16px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── Top bar ─────────────────── */
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 18px;
+    margin-bottom: 8px;
+  }
+  .device-id {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 1.6px; color: #00E5FF;
+  }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #00E5FF;
+    box-shadow: 0 0 0 0 rgba(0,229,255,.6);
+    animation: ping 2s ease-in-out infinite;
+  }
+  @keyframes ping {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,229,255,.5); }
+    50%      { box-shadow: 0 0 0 8px rgba(0,229,255,0); }
+  }
+
+  .battery {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .batt-shell {
+    width: 26px; height: 13px;
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 3px; padding: 1px;
+  }
+  .batt-fill {
+    height: 100%; background: #00E5FF;
+    border-radius: 2px; transition: width .6s;
+  }
+  .batt-nub {
+    width: 3px; height: 6px;
+    background: rgba(255,255,255,.25);
+    border-radius: 1px;
+  }
+  .batt-label {
+    font-size: 11px; color: rgba(255,255,255,.45);
+  }
+
+  /* ── Compass ─────────────────── */
+  .compass-wrap {
+    display: flex; justify-content: center;
+    align-items: center; position: relative;
+    margin: 4px 0 0;
+  }
+  #compassSvg { display: block; }
+
+  .speed-overlay {
+    position: absolute;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 6px;
+    pointer-events: none;
+  }
+  .speed-num {
+    font-size: 64px; font-weight: 800;
+    color: #fff; line-height: 1;
+    transition: color .3s;
+  }
+  .unit-pill {
+    font-size: 15px; font-weight: 700;
+    color: #00E5FF;
+    background: rgba(0,229,255,.12);
+    padding: 5px 14px; border-radius: 9px;
+    cursor: pointer; pointer-events: all;
+    transition: background .2s;
+    user-select: none;
+  }
+  .unit-pill:hover { background: rgba(0,229,255,.25); }
+  .unit-pill:active { background: rgba(0,229,255,.35); }
+
+  /* ── Direction readout ───────── */
+  .dir-readout {
+    text-align: center;
+    margin: 10px 0 20px;
+  }
+  .dir-value {
+    font-size: 24px; font-weight: 700;
+    color: #00E5FF;
+    transition: color .3s;
+  }
+  .dir-sub {
+    margin-top: 4px;
+    font-size: 10px; font-weight: 600;
+    color: rgba(255,255,255,.3);
+    letter-spacing: 2px;
+  }
+
+  /* ── Tiles ───────────────────── */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .tile {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 14px;
+    padding: 14px 6px;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 6px;
+  }
+  .tile-icon { font-size: 15px; }
+  .tile-val {
+    font-size: 16px; font-weight: 800; color: #fff;
+    letter-spacing: .5px;
+  }
+  .tile-lbl {
+    font-size: 9px; font-weight: 700;
+    color: rgba(255,255,255,.32);
+    letter-spacing: 1.4px;
+  }
+
+  /* ── Gusts bar ───────────────── */
+  .gust-bar-wrap {
+    margin-top: 14px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 12px;
+  }
+  .gust-header {
+    display: flex; justify-content: space-between;
+    font-size: 9px; font-weight: 700;
+    color: rgba(255,255,255,.3); letter-spacing: 1.5px;
+    margin-bottom: 8px;
+  }
+  .gust-track {
+    height: 28px; background: rgba(255,255,255,.04);
+    border-radius: 4px; overflow: hidden;
+    display: flex; align-items: flex-end;
+    gap: 2px; padding: 2px;
+  }
+  .gust-bar {
+    flex: 1; border-radius: 2px;
+    background: rgba(0,229,255,.6);
+    transition: height .4s;
+    min-height: 2px;
+  }
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <div class="device-id">
+      <div class="dot"></div>
+      CALYPSO UP10
+    </div>
+    <div class="battery">
+      <div class="batt-shell"><div class="batt-fill" id="bFill" style="width:72%"></div></div>
+      <div class="batt-nub"></div>
+      <span class="batt-label" id="bLabel">72%</span>
+    </div>
+  </div>
+
+  <!-- Compass -->
+  <div class="compass-wrap">
+    <svg id="compassSvg" width="310" height="310" viewBox="-155 -155 310 310">
+      <defs>
+        <linearGradient id="arcG" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="rgba(0,229,255,0.1)"/>
+          <stop offset="100%" stop-color="#00E5FF"/>
+        </linearGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- Outer ring -->
+      <circle r="150" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+
+      <!-- Tick marks (72 × 5°) -->
+      <g id="ticks"></g>
+
+      <!-- Direction arc -->
+      <path id="arc" fill="none" stroke="url(#arcG)" stroke-width="5.5" stroke-linecap="round"/>
+
+      <!-- Cardinal labels -->
+      <text x="0"    y="-116" text-anchor="middle" dominant-baseline="middle"
+            font-family="monospace" font-size="16" font-weight="800" fill="#00E5FF">N</text>
+      <text x="116"  y="0"    text-anchor="middle" dominant-baseline="middle"
+            font-family="monospace" font-size="13" fill="rgba(255,255,255,0.45)">E</text>
+      <text x="0"    y="116"  text-anchor="middle" dominant-baseline="middle"
+            font-family="monospace" font-size="13" fill="rgba(255,255,255,0.45)">S</text>
+      <text x="-116" y="0"   text-anchor="middle" dominant-baseline="middle"
+            font-family="monospace" font-size="13" fill="rgba(255,255,255,0.45)">W</text>
+
+      <!-- Intercardinals -->
+      <text x="82"  y="-82" text-anchor="middle" dominant-baseline="middle"
+            font-family="monospace" font-size="10" fill="rgba(255,255,255,0.2)">NE</text>
+      <text x="82"  y="82"  text-anchor="middle" dominant-baseline="middle"
+            font-family="monospace" font-size="10" fill="rgba(255,255,255,0.2)">SE</text>
+      <text x="-82" y="82"  text-anchor="middle" dominant-baseline="middle"
+            font-family="monospace" font-size="10" fill="rgba(255,255,255,0.2)">SW</text>
+      <text x="-82" y="-82" text-anchor="middle" dominant-baseline="middle"
+            font-family="monospace" font-size="10" fill="rgba(255,255,255,0.2)">NW</text>
+
+      <!-- Arrow -->
+      <g id="arrow" filter="url(#glow)">
+        <polygon id="arrowPoly" points="0,-86 6,2 0,-14 -6,2" fill="#00E5FF"/>
+      </g>
+
+      <!-- Centre hub -->
+      <circle r="7"  fill="#080C14"/>
+      <circle r="3.5" fill="#00E5FF"/>
+    </svg>
+
+    <div class="speed-overlay">
+      <div class="speed-num" id="speedNum">--.-</div>
+      <div class="unit-pill" id="unitPill" onclick="cycleUnit()">KTS</div>
+    </div>
+  </div>
+
+  <!-- Direction -->
+  <div class="dir-readout">
+    <div class="dir-value" id="dirValue">--- °</div>
+    <div class="dir-sub">WIND FROM</div>
+  </div>
+
+  <!-- Tiles -->
+  <div class="tiles">
+    <div class="tile">
+      <div class="tile-icon">🧭</div>
+      <div class="tile-val" id="tHeading">--°</div>
+      <div class="tile-lbl">HEADING</div>
+    </div>
+    <div class="tile">
+      <div class="tile-icon">🌡️</div>
+      <div class="tile-val" id="tTemp">--°C</div>
+      <div class="tile-lbl">TEMP</div>
+    </div>
+    <div class="tile">
+      <div class="tile-icon">🔋</div>
+      <div class="tile-val" id="tBatt">--%</div>
+      <div class="tile-lbl">BATTERY</div>
+    </div>
+    <div class="tile">
+      <div class="tile-icon" style="color:#FF8C42;font-size:18px">↑</div>
+      <div class="tile-val" id="tMax">--.-</div>
+      <div class="tile-lbl" id="lMax">MAX KTS</div>
+    </div>
+    <div class="tile">
+      <div class="tile-icon" style="color:#69D98C;font-size:18px">≈</div>
+      <div class="tile-val" id="tAvg">--.-</div>
+      <div class="tile-lbl" id="lAvg">AVG KTS</div>
+    </div>
+    <div class="tile">
+      <div class="tile-icon">🔄</div>
+      <div class="tile-val" id="tRoll">-/-°</div>
+      <div class="tile-lbl">ROLL/PITCH</div>
+    </div>
+  </div>
+
+  <!-- Gust history -->
+  <div class="gust-bar-wrap">
+    <div class="gust-header">
+      <span>WIND HISTORY (60s)</span>
+      <span id="gustLabel">KTS</span>
+    </div>
+    <div class="gust-track" id="gustTrack"></div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────
+const UNITS    = ['KTS','m/s','km/h'];
+const FACTORS  = [1.94384, 1, 3.6];
+let unitIdx    = 0;
+
+let dispDir    = 247;   // smoothed display direction
+let dispSpeed  = 6.4;   // smoothed display speed
+let targetDir  = 247;
+let targetSpeed= 6.4;
+let maxSpeed   = 9.2;
+let speedSum   = 6.4;
+let sampleCount= 1;
+let battery    = 72;
+let temp       = 18.3;
+let heading    = 182;
+let roll       = 2, pitch = -3;
+
+const history  = Array(30).fill(6.4); // ~60s at 2s intervals
+
+// ── Build tick marks ───────────────────────────────────
+const tg = document.getElementById('ticks');
+for (let i = 0; i < 72; i++) {
+  const a  = i * 5;
+  const maj = a % 45 === 0;
+  const r  = 150, len = maj ? 15 : 7;
+  const op = maj ? 0.5 : 0.13;
+  const rad = (a - 90) * Math.PI / 180;
+  const l = document.createElementNS('http://www.w3.org/2000/svg','line');
+  l.setAttribute('x1', Math.cos(rad)*r);
+  l.setAttribute('y1', Math.sin(rad)*r);
+  l.setAttribute('x2', Math.cos(rad)*(r-len));
+  l.setAttribute('y2', Math.sin(rad)*(r-len));
+  l.setAttribute('stroke', `rgba(255,255,255,${op})`);
+  l.setAttribute('stroke-width', maj ? 2 : 1);
+  l.setAttribute('stroke-linecap','round');
+  tg.appendChild(l);
+}
+
+// ── Build gust bars ────────────────────────────────────
+const track = document.getElementById('gustTrack');
+for (let i = 0; i < 30; i++) {
+  const b = document.createElement('div');
+  b.className = 'gust-bar';
+  b.id = `gb${i}`;
+  track.appendChild(b);
+}
+
+// ── Compass helpers ────────────────────────────────────
+function polar(deg, r) {
+  const rad = (deg - 90) * Math.PI / 180;
+  return [Math.cos(rad)*r, Math.sin(rad)*r];
+}
+function arcD(cDeg, spread, r) {
+  const [x1,y1] = polar(cDeg - spread, r);
+  const [x2,y2] = polar(cDeg + spread, r);
+  return `M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`;
+}
+function compassLabel(deg) {
+  const pts = ['N','NNE','NE','ENE','E','ESE','SE','SSE',
+               'S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  return pts[Math.round(((deg % 360)+360) / 22.5) % 16];
+}
+
+// ── Unit cycle ─────────────────────────────────────────
+function cycleUnit() {
+  unitIdx = (unitIdx+1) % UNITS.length;
+  document.getElementById('unitPill').textContent = UNITS[unitIdx];
+  const u = UNITS[unitIdx];
+  document.getElementById('lMax').textContent = `MAX ${u}`;
+  document.getElementById('lAvg').textContent = `AVG ${u}`;
+  document.getElementById('gustLabel').textContent = u;
+  renderFrame();
+}
+
+// ── Render ─────────────────────────────────────────────
+function renderFrame() {
+  const f   = FACTORS[unitIdx];
+  const spd = dispSpeed * f;
+
+  document.getElementById('speedNum').textContent = spd.toFixed(1);
+  document.getElementById('dirValue').textContent =
+    `${Math.round(((dispDir%360)+360)%360)}°   ${compassLabel(dispDir)}`;
+
+  // Compass
+  document.getElementById('arc').setAttribute('d', arcD(dispDir, 22, 125));
+  document.getElementById('arrow').setAttribute('transform', `rotate(${dispDir})`);
+
+  // Tiles
+  document.getElementById('tHeading').textContent = `${Math.round(heading)}°`;
+  document.getElementById('tTemp').textContent    = `${temp.toFixed(1)}°C`;
+  document.getElementById('tBatt').textContent    = `${battery}%`;
+  document.getElementById('tMax').textContent     = (maxSpeed*f).toFixed(1);
+  document.getElementById('tAvg').textContent     = ((speedSum/sampleCount)*f).toFixed(1);
+  document.getElementById('tRoll').textContent    = `${roll>0?'+':''}${roll}/${pitch>0?'+':''}${pitch}°`;
+
+  // Battery widget
+  document.getElementById('bFill').style.width   = `${battery}%`;
+  document.getElementById('bLabel').textContent  = `${battery}%`;
+
+  // Gust bars
+  const maxH = history.reduce((a,b)=>Math.max(a,b), 0.1) * f;
+  history.forEach((v,i)=>{
+    const el = document.getElementById(`gb${i}`);
+    if (el) {
+      const h = Math.max(2, ((v*f) / maxH) * 24);
+      el.style.height = h + 'px';
+      const ratio = (v*f) / maxH;
+      el.style.background = ratio > 0.8
+        ? 'rgba(255,100,50,0.8)'
+        : ratio > 0.6
+          ? 'rgba(255,180,50,0.7)'
+          : 'rgba(0,229,255,0.6)';
+    }
+  });
+}
+
+// ── Smooth animation loop ──────────────────────────────
+function animLoop() {
+  // Smooth direction (shortest path)
+  let delta = ((targetDir - dispDir + 540) % 360) - 180;
+  dispDir  += delta * 0.06;
+  dispDir   = ((dispDir % 360) + 360) % 360;
+
+  // Smooth speed
+  dispSpeed += (targetSpeed - dispSpeed) * 0.07;
+
+  renderFrame();
+  requestAnimationFrame(animLoop);
+}
+
+// ── Simulate sensor data ───────────────────────────────
+function simulateTick() {
+  // Wind wanders slowly
+  targetDir   = (targetDir + (Math.random()-0.5)*18 + 360) % 360;
+  targetSpeed = Math.max(0.3, Math.min(25, targetSpeed + (Math.random()-0.45)*1.2));
+
+  if (targetSpeed > maxSpeed) maxSpeed = targetSpeed;
+  speedSum   += targetSpeed;
+  sampleCount++;
+
+  heading = (heading + (Math.random()-0.5)*4 + 360) % 360;
+  temp   += (Math.random()-0.5)*0.4;
+  roll    = Math.round((Math.random()-0.5)*14);
+  pitch   = Math.round((Math.random()-0.5)*10);
+
+  history.shift();
+  history.push(targetSpeed);
+}
+
+// Kick off
+animLoop();
+simulateTick(); // initial data immediately
+setInterval(simulateTick, 1500);
+</script>
+</body>
+</html>
