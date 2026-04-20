@@ -6,69 +6,75 @@ function convert(mps, unit) {
   return mps
 }
 
-function hexOpacity(color, alpha) {
-  if (color === '#fff' || color === 'white' || color === '#ffffff') {
-    return `rgba(255,255,255,${alpha})`
-  }
-  return `rgba(0,0,0,${alpha})`
-}
-
-export default function SpeedHistoryChart({ buckets, unit = 'KTS', foreground = '#fff', height = 110 }) {
+export default function SpeedHistoryChart({ buckets, unit = 'KTS', foreground = '#fff' }) {
+  const containerRef = useRef(null)
   const canvasRef = useRef(null)
 
   useEffect(() => {
+    const container = containerRef.current
     const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    const W = canvas.width, H = canvas.height
+    if (!container || !canvas) return
 
-    ctx.clearRect(0, 0, W, H)
+    function draw() {
+      const W = container.clientWidth
+      const H = container.clientHeight
+      if (!W || !H) return
+      canvas.width = W * 2
+      canvas.height = H * 2
+      canvas.style.width = W + 'px'
+      canvas.style.height = H + 'px'
 
-    const COUNT = 10
-    const values = buckets.slice(-COUNT)
-    const converted = values.map(v => convert(v, unit))
-    const maxVal = Math.max(1, ...converted)
-    const gap = 4
-    const barW = (W - gap * (COUNT - 1)) / COUNT
-    const chartH = H - 20
+      const ctx = canvas.getContext('2d')
+      ctx.clearRect(0, 0, W * 2, H * 2)
+      ctx.scale(2, 2)
 
-    const emptySlots = COUNT - values.length
-    converted.forEach((disp, i) => {
-      const slot = emptySlots + i
-      const x = slot * (barW + gap)
-      const barH = Math.max(2, (disp / maxVal) * chartH)
-      const y = chartH - barH
-      const alpha = i === converted.length - 1 ? 1.0 : 0.7
-      ctx.fillStyle = hexOpacity(foreground, alpha)
-      ctx.fillRect(x, y, barW, barH)
+      const col = foreground === '#fff' ? '255,255,255' : '0,0,0'
+      const COUNT = 10
+      const values = buckets.slice(-COUNT)
+      const converted = values.map(v => convert(v, unit))
+      const maxVal = Math.max(1, ...converted)
+      const labelH = 14
+      const chartH = H - labelH
+      const gap = 4
+      const barW = (W - gap * (COUNT - 1)) / COUNT
+      const emptySlots = COUNT - values.length
 
-      // Label
-      ctx.fillStyle = hexOpacity(foreground, 0.5)
-      ctx.font = `${9}px monospace`
-      ctx.textAlign = 'center'
-      ctx.fillText(disp.toFixed(0), x + barW / 2, y - 2)
-    })
+      converted.forEach((disp, i) => {
+        const slot = emptySlots + i
+        const x = slot * (barW + gap)
+        const barH = Math.max(2, (disp / maxVal) * (chartH - 16))
+        const y = chartH - barH
+        const alpha = i === converted.length - 1 ? 1.0 : 0.7
+        ctx.fillStyle = `rgba(${col},${alpha})`
+        ctx.fillRect(x, y, barW, barH)
+
+        ctx.fillStyle = `rgba(${col},0.5)`
+        ctx.font = `${9}px monospace`
+        ctx.textAlign = 'center'
+        ctx.fillText(disp.toFixed(0), x + barW / 2, y - 2)
+      })
+
+      // Time labels
+      for (let i = 0; i < COUNT; i++) {
+        const label = i === COUNT - 1 ? 'NOW' : `−${(COUNT - 1 - i) * 3}m`
+        const slot = i
+        const x = slot * (barW + gap) + barW / 2
+        ctx.fillStyle = `rgba(${col},0.22)`
+        ctx.font = `7px monospace`
+        ctx.textAlign = 'center'
+        ctx.fillText(label, x, H - 1)
+      }
+    }
+
+    const ro = new ResizeObserver(draw)
+    ro.observe(container)
+    draw()
+    return () => ro.disconnect()
   }, [buckets, unit, foreground])
 
-  const timeLabels = Array.from({ length: 10 }, (_, i) => (9 - i) === 0 ? 'NOW' : `−${(9 - i) * 3}m`)
-
   return (
-    <div style={{ width: '100%' }}>
-      <canvas
-        ref={canvasRef}
-        width={800}
-        height={(height - 18) * 2}
-        style={{ width: '100%', height: height - 18, display: 'block' }}
-      />
-      <div style={{ display: 'flex', paddingTop: 2 }}>
-        {timeLabels.map((l, i) => (
-          <span key={i} style={{
-            flex: 1, textAlign: 'center',
-            fontSize: 7, fontFamily: 'monospace',
-            color: hexOpacity(foreground, 0.22),
-          }}>{l}</span>
-        ))}
-      </div>
+    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0 }} />
     </div>
   )
 }
