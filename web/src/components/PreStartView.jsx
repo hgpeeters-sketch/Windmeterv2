@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { compassLabel } from '../useWindData'
 import OscillationChart from './OscillationChart'
 import SpeedHistoryChart from './SpeedHistoryChart'
@@ -14,41 +14,55 @@ const BG  = i => i % 2 === 0 ? '#000' : '#fff'
 const FG  = i => i % 2 === 0 ? '#fff' : '#000'
 const RGB = i => i % 2 === 0 ? '255,255,255' : '0,0,0'
 
-// Number fills the tile — label & sub-label are absolute overlays (Vakaros style)
+// Computes the largest font size that fits text within (W × H) using canvas measurement
+function fitFontSize(text, W, H, weight = '900') {
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  let fs = Math.floor(H * 0.88)  // start at 88% of height
+  while (fs > 20) {
+    ctx.font = `${weight} ${fs}px monospace`
+    if (ctx.measureText(text).width <= W - 8) break
+    fs -= 2
+  }
+  return fs
+}
+
 function BigTile({ idx, label, value, sub, extra }) {
+  const containerRef = useRef(null)
+  const [fontSize, setFontSize] = useState(100)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const compute = () => {
+      const { clientWidth: W, clientHeight: H } = el
+      if (W && H) setFontSize(fitFontSize(value, W, H))
+    }
+    const ro = new ResizeObserver(compute)
+    ro.observe(el)
+    compute()
+    return () => ro.disconnect()
+  }, [value])
+
   return (
-    <div style={{ flex: 2, minHeight: 0, background: BG(idx), position: 'relative', overflow: 'hidden' }}>
-      {/* tiny label top-left */}
-      <div style={{
-        position: 'absolute', top: 6, left: 10,
-        display: 'flex', alignItems: 'center', gap: 8, zIndex: 1,
-      }}>
+    <div ref={containerRef} style={{ flex: 2, minHeight: 0, background: BG(idx), position: 'relative', overflow: 'hidden' }}>
+      {/* tiny label top-left + optional extra (e.g. unit toggle) */}
+      <div style={{ position: 'absolute', top: 6, left: 10, display: 'flex', alignItems: 'center', gap: 8, zIndex: 1 }}>
         <span style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(idx)},0.4)` }}>
           {label}
         </span>
         {extra}
       </div>
-      {/* big number — fills tile height */}
-      <div style={{
-        height: '100%', display: 'flex',
-        alignItems: 'center',
-        paddingLeft: 6, paddingRight: 6,
-        overflow: 'hidden',
-      }}>
-        <span style={{
-          fontSize: 'clamp(60px, 17vh, 140px)',
-          fontWeight: 900, fontFamily: 'monospace',
-          color: FG(idx), lineHeight: 1,
-          letterSpacing: '-0.02em',
-        }}>{value}</span>
+      {/* auto-sized number */}
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', paddingLeft: 4 }}>
+        <span style={{ fontSize, fontWeight: 900, fontFamily: 'monospace', color: FG(idx), lineHeight: 1, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+          {value}
+        </span>
       </div>
-      {/* unit / compass label — bottom right */}
-      <span style={{
-        position: 'absolute', bottom: 8, right: 10,
-        fontSize: 'clamp(14px, 3.5vh, 28px)',
-        fontFamily: 'monospace', fontWeight: 700,
-        color: `rgba(${RGB(idx)},0.45)`,
-      }}>{sub}</span>
+      {/* unit / compass — bottom right */}
+      <span style={{ position: 'absolute', bottom: 8, right: 10, fontSize: 'clamp(14px, 3vh, 26px)', fontFamily: 'monospace', fontWeight: 700, color: `rgba(${RGB(idx)},0.45)` }}>
+        {sub}
+      </span>
     </div>
   )
 }
@@ -81,11 +95,7 @@ export default function PreStartView({ wind, samples, speedBuckets }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
       {/* Row 0: Header — flex 1 */}
-      <div style={{
-        flex: 1, minHeight: 0, background: BG(0),
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 14px', flexShrink: 0,
-      }}>
+      <div style={{ flex: 1, minHeight: 0, background: BG(0), display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px' }}>
         <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(0)},0.5)`, whiteSpace: 'nowrap' }}>
           PRE-START
         </span>
