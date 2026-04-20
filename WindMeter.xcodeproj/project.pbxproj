@@ -20,6 +20,8 @@
 		AA000D00000000000000002A /* InstrumentTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000D00000000000000001A /* InstrumentTileView.swift */; };
 		AA000E00000000000000002A /* AddTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000E00000000000000001A /* AddTileView.swift */; };
 		AA000F00000000000000002A /* PreStartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000F00000000000000001A /* PreStartView.swift */; };
+		AA001000000000000000002A /* RaceAreaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA001000000000000000001A /* RaceAreaView.swift */; };
+		AA001100000000000000002A /* AnthropicClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA001100000000000000001A /* AnthropicClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +40,8 @@
 		AA000D00000000000000001A /* InstrumentTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstrumentTileView.swift; sourceTree = "<group>"; };
 		AA000E00000000000000001A /* AddTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTileView.swift; sourceTree = "<group>"; };
 		AA000F00000000000000001A /* PreStartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreStartView.swift; sourceTree = "<group>"; };
+		AA001000000000000000001A /* RaceAreaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceAreaView.swift; sourceTree = "<group>"; };
+		AA001100000000000000001A /* AnthropicClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +72,8 @@
 				AA000D00000000000000001A /* InstrumentTileView.swift */,
 				AA000E00000000000000001A /* AddTileView.swift */,
 				AA000F00000000000000001A /* PreStartView.swift */,
+				AA001000000000000000001A /* RaceAreaView.swift */,
+				AA001100000000000000001A /* AnthropicClient.swift */,
 			);
 			path = WindMeter;
 			sourceTree = "<group>";
@@ -169,6 +175,8 @@
 				AA000D00000000000000002A /* InstrumentTileView.swift in Sources */,
 				AA000E00000000000000002A /* AddTileView.swift in Sources */,
 				AA000F00000000000000002A /* PreStartView.swift in Sources */,
+				AA001000000000000000002A /* RaceAreaView.swift in Sources */,
+				AA001100000000000000002A /* AnthropicClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

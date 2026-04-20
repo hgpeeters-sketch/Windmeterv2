@@ -1,5 +1,7 @@
 import SwiftUI
 
+private let tabs = ["PRE-START", "RACE AREA", "RACING"]
+
 struct ContentView: View {
     @StateObject private var bluetooth = BluetoothManager()
     @State private var page = 0
@@ -10,28 +12,31 @@ struct ContentView: View {
 
             if bluetooth.connectionState.isConnected {
                 VStack(spacing: 0) {
-                    // Swipeable screens
                     TabView(selection: $page) {
                         PreStartView(bluetooth: bluetooth).tag(0)
-                        DashboardView(bluetooth: bluetooth).tag(1)
+                        RaceAreaView(bluetooth: bluetooth).tag(1)
+                        DashboardView(bluetooth: bluetooth).tag(2)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
 
-                    // Page indicator strip
+                    // Tab bar
                     Divider().background(Color.white.opacity(0.12))
                     HStack(spacing: 0) {
-                        PageTab(label: "PRE-START", index: 0, selected: page)
-                            .onTapGesture { withAnimation { page = 0 } }
-                        Divider().background(Color.white.opacity(0.12)).frame(width: 1)
-                        PageTab(label: "RACING",    index: 1, selected: page)
-                            .onTapGesture { withAnimation { page = 1 } }
+                        ForEach(tabs.indices, id: \.self) { i in
+                            PageTab(label: tabs[i], index: i, selected: page)
+                                .onTapGesture { withAnimation { page = i } }
+                            if i < tabs.count - 1 {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.12))
+                                    .frame(width: 1)
+                            }
+                        }
                     }
                     .frame(height: 36)
                 }
                 .transition(.opacity)
             } else {
-                ScanningView(bluetooth: bluetooth)
-                    .transition(.opacity)
+                ScanningView(bluetooth: bluetooth).transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: 0.35), value: bluetooth.connectionState.isConnected)
@@ -43,14 +48,13 @@ private struct PageTab: View {
     let label: String
     let index: Int
     let selected: Int
-
     var body: some View {
         ZStack {
             Color.black
             Text(label)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .tracking(2)
-                .foregroundColor(selected == index ? .white : .white.opacity(0.3))
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .tracking(1.5)
+                .foregroundColor(selected == index ? .white : .white.opacity(0.28))
         }
         .frame(maxWidth: .infinity)
     }
