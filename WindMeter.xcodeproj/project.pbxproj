@@ -19,6 +19,7 @@
 		AA000C00000000000000002A /* TileConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000C00000000000000001A /* TileConfig.swift */; };
 		AA000D00000000000000002A /* InstrumentTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000D00000000000000001A /* InstrumentTileView.swift */; };
 		AA000E00000000000000002A /* AddTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000E00000000000000001A /* AddTileView.swift */; };
+		AA000F00000000000000002A /* PreStartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000F00000000000000001A /* PreStartView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +37,7 @@
 		AA000C00000000000000001A /* TileConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileConfig.swift; sourceTree = "<group>"; };
 		AA000D00000000000000001A /* InstrumentTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstrumentTileView.swift; sourceTree = "<group>"; };
 		AA000E00000000000000001A /* AddTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTileView.swift; sourceTree = "<group>"; };
+		AA000F00000000000000001A /* PreStartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreStartView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -65,6 +67,7 @@
 				AA000C00000000000000001A /* TileConfig.swift */,
 				AA000D00000000000000001A /* InstrumentTileView.swift */,
 				AA000E00000000000000001A /* AddTileView.swift */,
+				AA000F00000000000000001A /* PreStartView.swift */,
 			);
 			path = WindMeter;
 			sourceTree = "<group>";
@@ -165,6 +168,7 @@
 				AA000C00000000000000002A /* TileConfig.swift in Sources */,
 				AA000D00000000000000002A /* InstrumentTileView.swift in Sources */,
 				AA000E00000000000000002A /* AddTileView.swift in Sources */,
+				AA000F00000000000000002A /* PreStartView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

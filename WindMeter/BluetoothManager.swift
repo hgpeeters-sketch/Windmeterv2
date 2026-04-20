@@ -12,12 +12,29 @@ final class BluetoothManager: NSObject, ObservableObject {
     private static let envSpeedCharUUID   = CBUUID(string: "2A72")
     private static let envDirCharUUID     = CBUUID(string: "2A73")
 
+    // MARK: – Time-series sample
+    struct WindSample {
+        let time: Date
+        let direction: Int   // TWD degrees
+        let speed: Double    // m/s
+    }
+
     // MARK: – Published state
     @Published var windData = WindData()
     @Published var maxWindSpeed: Double = 0
     @Published var avgWindSpeed: Double = 0
     @Published var connectionState: ConnectionState = .disconnected
     @Published var discoveredPeripherals: [(CBPeripheral, String)] = []
+
+    /// One sample per ~10 s, last 35 min kept.
+    @Published private(set) var samples: [WindSample] = []
+    /// 3-minute averaged TWS buckets, newest last (max 10).
+    @Published private(set) var speedBuckets: [Double] = []
+
+    private var lastSampleDate: Date = .distantPast
+    private var bucketStart:    Date = Date()
+    private var bucketAccum:    [Double] = []
+    private let sampleInterval: TimeInterval = 10
 
     enum ConnectionState: Equatable {
         case disconnected, scanning, connecting, connected
@@ -75,6 +92,29 @@ final class BluetoothManager: NSObject, ObservableObject {
         speedHistory.append(speed)
         if speedHistory.count > historyMax { speedHistory.removeFirst() }
         avgWindSpeed = speedHistory.reduce(0, +) / Double(speedHistory.count)
+    }
+
+    private func recordSample() {
+        let now = Date()
+        guard now.timeIntervalSince(lastSampleDate) >= sampleInterval else { return }
+        lastSampleDate = now
+
+        // Append & prune to 35-min window
+        samples.append(WindSample(time: now,
+                                  direction: windData.windDirection,
+                                  speed: windData.windSpeed))
+        let cutoff = now.addingTimeInterval(-35 * 60)
+        samples.removeAll { $0.time < cutoff }
+
+        // 3-minute speed buckets
+        bucketAccum.append(windData.windSpeed)
+        if now.timeIntervalSince(bucketStart) >= 3 * 60 {
+            let avg = bucketAccum.reduce(0, +) / Double(bucketAccum.count)
+            speedBuckets.append(avg)
+            if speedBuckets.count > 10 { speedBuckets.removeFirst() }
+            bucketAccum = []
+            bucketStart = now
+        }
     }
 }
 
@@ -139,6 +179,7 @@ extension BluetoothManager: CBPeripheralDelegate {
                 updateStats(speed: r.windSpeed)
                 r.batteryLevel = max(windData.batteryLevel, r.batteryLevel)
                 windData = r
+                recordSample()
             }
         case Self.batteryCharUUID:
             if let b = data.first { windData.batteryLevel = Int(b) }
