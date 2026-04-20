@@ -5,7 +5,7 @@ struct DashboardView: View {
     @State private var unit: SpeedUnit = .knots
 
     enum SpeedUnit: String, CaseIterable {
-        case knots = "KTS", ms = "m/s", kmh = "km/h"
+        case knots = "KTS", ms = "M/S", kmh = "KM/H"
         func value(from d: WindData) -> Double {
             switch self {
             case .knots: return d.windSpeedKnots
@@ -13,119 +13,134 @@ struct DashboardView: View {
             case .kmh:   return d.windSpeedKmh
             }
         }
-        func formatted(_ v: Double) -> String { String(format: "%.1f", v) }
     }
 
     private var data: WindData { bluetooth.windData }
-    private let cyan = Color.cyan
-    private let bg   = Color(red: 0.03, green: 0.04, blue: 0.08)
 
     var body: some View {
         ZStack {
-            bg.ignoresSafeArea()
+            Color.black.ignoresSafeArea()
 
             VStack(spacing: 0) {
 
-                // ── Top bar ─────────────────────────────────────────────
+                // ── Status strip ─────────────────────────────────
                 HStack {
-                    // Connection dot + label
-                    HStack(spacing: 6) {
-                        Circle().fill(cyan).frame(width: 7, height: 7)
-                            .shadow(color: cyan.opacity(0.8), radius: 4)
-                        Text("CALYPSO UP10")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundColor(cyan.opacity(0.9))
-                            .tracking(1.5)
-                    }
+                    Text("● CALYPSO UP10")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.5))
                     Spacer()
-                    BatteryIndicator(level: data.batteryLevel)
-                }
-                .padding(.horizontal, 22)
-                .padding(.top, 16)
-
-                Spacer(minLength: 12)
-
-                // ── Compass + speed overlay ───────────────────────────
-                ZStack {
-                    WindCompassView(direction: data.windDirection, diameter: 290)
-
-                    VStack(spacing: 2) {
-                        // Main speed number
-                        Text(unit.formatted(unit.value(from: data)))
-                            .font(.system(size: 68, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white)
-                            .contentTransition(.numericText())
-                            .animation(.spring(response: 0.3), value: data.windSpeed)
-
-                        // Tappable unit badge
-                        Button { cycleUnit() } label: {
-                            Text(unit.rawValue)
-                                .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                                .foregroundColor(cyan)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 4)
-                                .background(cyan.opacity(0.12))
-                                .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
-                Spacer(minLength: 8)
-
-                // ── Direction readout ────────────────────────────────
-                VStack(spacing: 4) {
-                    Text("\(data.windDirection)°  \(compassLabel(data.windDirection))")
-                        .font(.system(size: 24, weight: .semibold, design: .monospaced))
-                        .foregroundColor(cyan)
-                        .animation(.spring(response: 0.4), value: data.windDirection)
-
-                    Text("WIND FROM")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.white.opacity(0.3))
-                        .tracking(2)
-                }
-                .padding(.bottom, 18)
-
-                // ── Data tiles ───────────────────────────────────────
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
-                          spacing: 10) {
-                    DataTileView(label: "HEADING",
-                                 value: "\(data.heading)°",
-                                 icon: "safari")
-                    DataTileView(label: "TEMP",
-                                 value: String(format: "%.0f°C", data.temperature),
-                                 icon: "thermometer.medium")
-                    DataTileView(label: "BATTERY",
-                                 value: "\(data.batteryLevel)%",
-                                 icon: "battery.75",
-                                 accent: batteryColor(data.batteryLevel))
-                    DataTileView(label: "MAX \(unit.rawValue)",
-                                 value: unit.formatted(unit.value(from: WindData(windSpeed: bluetooth.maxWindSpeed))),
-                                 icon: "arrow.up.right",
-                                 accent: .orange.opacity(0.8))
-                    DataTileView(label: "AVG \(unit.rawValue)",
-                                 value: unit.formatted(unit.value(from: WindData(windSpeed: bluetooth.avgWindSpeed))),
-                                 icon: "waveform.path",
-                                 accent: .green.opacity(0.8))
-                    DataTileView(label: "ROLL / PITCH",
-                                 value: String(format: "%.0f/%.0f°", data.roll, data.pitch),
-                                 icon: "rotate.3d")
+                    Text("BAT \(data.batteryLevel)%")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.5))
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 24)
+                .padding(.vertical, 10)
+
+                Divider().background(Color.white.opacity(0.2))
+
+                // ── Wind Speed (large box) ────────────────────────
+                Button(action: cycleUnit) {
+                    InstrumentBox {
+                        VStack(spacing: 6) {
+                            Label("TWS", unit: unit.rawValue)
+                            Text(String(format: "%.1f", unit.value(from: data)))
+                                .font(.system(size: 88, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white)
+                                .contentTransition(.numericText())
+                                .animation(.spring(response: 0.3), value: data.windSpeed)
+                        }
+                    }
+                    .frame(height: 148)
+                }
+                .buttonStyle(.plain)
+
+                Divider().background(Color.white.opacity(0.2))
+
+                // ── Wind Direction + Compass ──────────────────────
+                HStack(spacing: 0) {
+                    InstrumentBox {
+                        VStack(spacing: 6) {
+                            Label("TWD", unit: "")
+                            Text("\(data.windDirection)°")
+                                .font(.system(size: 52, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white)
+                                .animation(.spring(response: 0.4), value: data.windDirection)
+                            Text(compassLabel(data.windDirection))
+                                .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                    }
+
+                    Divider().background(Color.white.opacity(0.2))
+                        .frame(width: 1)
+
+                    InstrumentBox {
+                        WindRoseView(direction: data.windDirection, heading: data.heading)
+                    }
+                }
+                .frame(height: 160)
+
+                Divider().background(Color.white.opacity(0.2))
+
+                // ── 2×2 data grid ─────────────────────────────────
+                VStack(spacing: 0) {
+                    HStack(spacing: 0) {
+                        InstrumentBox {
+                            SmallInstrument(label: "HDG", value: "\(data.heading)°")
+                        }
+                        Divider().background(Color.white.opacity(0.2)).frame(width: 1)
+                        InstrumentBox {
+                            SmallInstrument(label: "TEMP", value: String(format: "%.0f°C", data.temperature))
+                        }
+                    }
+                    Divider().background(Color.white.opacity(0.2))
+                    HStack(spacing: 0) {
+                        InstrumentBox {
+                            SmallInstrument(
+                                label: "MAX \(unit.rawValue)",
+                                value: String(format: "%.1f", unit.value(from: WindData(windSpeed: bluetooth.maxWindSpeed)))
+                            )
+                        }
+                        Divider().background(Color.white.opacity(0.2)).frame(width: 1)
+                        InstrumentBox {
+                            SmallInstrument(
+                                label: "AVG \(unit.rawValue)",
+                                value: String(format: "%.1f", unit.value(from: WindData(windSpeed: bluetooth.avgWindSpeed)))
+                            )
+                        }
+                    }
+                }
+                .frame(maxHeight: .infinity)
+
+                Divider().background(Color.white.opacity(0.2))
+
+                // ── Roll / Pitch strip ────────────────────────────
+                HStack(spacing: 0) {
+                    InstrumentBox {
+                        SmallInstrument(label: "ROLL",
+                                        value: String(format: "%+.0f°", data.roll))
+                    }
+                    Divider().background(Color.white.opacity(0.2)).frame(width: 1)
+                    InstrumentBox {
+                        SmallInstrument(label: "PITCH",
+                                        value: String(format: "%+.0f°", data.pitch))
+                    }
+                    Divider().background(Color.white.opacity(0.2)).frame(width: 1)
+                    InstrumentBox {
+                        SmallInstrument(label: "BAT",
+                                        value: "\(data.batteryLevel)%")
+                    }
+                }
+                .frame(height: 82)
+
             }
         }
+        .preferredColorScheme(.dark)
     }
 
     private func cycleUnit() {
         let all = SpeedUnit.allCases
-        let next = (all.firstIndex(of: unit)! + 1) % all.count
-        withAnimation { unit = all[next] }
-    }
-
-    private func batteryColor(_ pct: Int) -> Color {
-        pct > 30 ? Color.cyan.opacity(0.7) : Color.orange.opacity(0.8)
+        withAnimation { unit = all[(all.firstIndex(of: unit)! + 1) % all.count] }
     }
 
     private func compassLabel(_ deg: Int) -> String {
@@ -135,28 +150,50 @@ struct DashboardView: View {
     }
 }
 
-// MARK: – Battery indicator widget
-private struct BatteryIndicator: View {
-    let level: Int
-    var color: Color { level > 30 ? .cyan : .orange }
+// MARK: – Shared sub-views
 
+struct InstrumentBox<Content: View>: View {
+    let content: () -> Content
+    init(@ViewBuilder content: @escaping () -> Content) { self.content = content }
+    var body: some View {
+        ZStack { content() }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct Label: View {
+    let label: String
+    let unit: String
+    init(_ label: String, unit: String) { self.label = label; self.unit = unit }
     var body: some View {
         HStack(spacing: 4) {
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 2.5)
-                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                    .frame(width: 26, height: 13)
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(color)
-                    .frame(width: max(2, CGFloat(level) / 100 * 24), height: 11)
-                    .padding(.leading, 1)
-            }
-            RoundedRectangle(cornerRadius: 1)
-                .fill(Color.white.opacity(0.25))
-                .frame(width: 3, height: 6)
-            Text("\(level)%")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
+            Text(label)
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .foregroundColor(.white.opacity(0.45))
+                .tracking(2)
+            if !unit.isEmpty {
+                Text(unit)
+                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.3))
+            }
+        }
+    }
+}
+
+struct SmallInstrument: View {
+    let label: String
+    let value: String
+    var body: some View {
+        VStack(spacing: 5) {
+            Text(label)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundColor(.white.opacity(0.4))
+                .tracking(1.5)
+            Text(value)
+                .font(.system(size: 30, weight: .bold, design: .monospaced))
+                .foregroundColor(.white)
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
         }
     }
 }
