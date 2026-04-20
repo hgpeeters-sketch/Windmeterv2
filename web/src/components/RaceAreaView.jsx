@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { compassLabel } from '../useWindData'
-import { analyzeWind, computeStats, getApiKey, setApiKey } from '../anthropic'
+import { analyzeWind, computeStats, getApiKey } from '../anthropic'
 import OscillationChart from './OscillationChart'
 import SpeedHistoryChart from './SpeedHistoryChart'
 
@@ -9,30 +9,6 @@ const TARGET_SECS = 15 * 60
 function timeFormatted(s) {
   const m = Math.floor(s / 60), sec = Math.floor(s % 60)
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
-}
-
-// ── API Key modal ──────────────────────────────────────────────────
-function APIKeyModal({ onClose }) {
-  const [key, setKey] = useState(getApiKey())
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div style={{ background: '#000', border: '1px solid rgba(255,255,255,0.15)', width: '90%', maxWidth: 400 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-          <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 12, letterSpacing: '0.15em', color: '#fff' }}>ANTHROPIC API KEY</span>
-          <button onClick={() => { setApiKey(key.trim()); onClose() }} style={{ background: 'none', border: 'none', color: '#fff', fontFamily: 'monospace', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>SAVE</button>
-        </div>
-        <div style={{ padding: 18 }}>
-          <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', marginTop: 0 }}>Enter your key from console.anthropic.com</p>
-          <input
-            value={key} onChange={e => setKey(e.target.value)}
-            placeholder="sk-ant-..."
-            style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'monospace', fontSize: 13, padding: 10 }}
-          />
-          <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>Key is stored on-device only and used solely to call the Claude API for wind analysis.</p>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // ── Stat box ───────────────────────────────────────────────────────
@@ -52,7 +28,6 @@ export default function RaceAreaView({ wind, samples, speedBuckets }) {
   const [raceSamples, setRaceSamples] = useState([])
   const [result, setResult] = useState(null)   // { stats, summary }
   const [errorMsg, setErrorMsg] = useState(null)
-  const [showKey, setShowKey] = useState(false)
   const [time, setTime] = useState('')
   const since = useRef(null)
 
@@ -111,10 +86,7 @@ export default function RaceAreaView({ wind, samples, speedBuckets }) {
     <div style={{ background: '#000' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px' }}>
         <span style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)' }}>RACE AREA</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => setShowKey(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>⚙</button>
-          <span style={{ fontSize: 22, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>{time}</span>
-        </div>
+        <span style={{ fontSize: 22, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>{time}</span>
       </div>
       {divider}
     </div>
@@ -248,7 +220,6 @@ export default function RaceAreaView({ wind, samples, speedBuckets }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {header}
       {body}
-      {showKey && <APIKeyModal onClose={() => setShowKey(false)} />}
     </div>
   )
 }

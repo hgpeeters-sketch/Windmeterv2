@@ -3,8 +3,9 @@ import { useWindData } from './useWindData'
 import PreStartView from './components/PreStartView'
 import RaceAreaView from './components/RaceAreaView'
 import DashboardView from './components/DashboardView'
+import SettingsView from './components/SettingsView'
 
-const TABS = ['PRE-START', 'RACE AREA', 'RACING']
+const TABS = ['PRE-START', 'RACE AREA', 'RACING', '⚙']
 
 function App() {
   const { wind, samples, speedBuckets } = useWindData()
@@ -23,6 +24,7 @@ function App() {
         {tab === 0 && <PreStartView wind={wind} samples={samples} speedBuckets={speedBuckets} />}
         {tab === 1 && <RaceAreaView wind={wind} samples={samples} speedBuckets={speedBuckets} />}
         {tab === 2 && <DashboardView wind={wind} />}
+        {tab === 3 && <SettingsView />}
       </div>
 
       <div style={{ height: 1, background: 'rgba(255,255,255,0.12)' }} />
@@ -32,11 +34,13 @@ function App() {
             key={i}
             onClick={() => setTab(i)}
             style={{
-              flex: 1, background: '#000', border: 'none',
+              flex: i === 3 ? 0.4 : 1, background: '#000', border: 'none',
               borderRight: i < TABS.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none',
               color: tab === i ? '#fff' : 'rgba(255,255,255,0.28)',
-              fontFamily: 'monospace', fontWeight: 700, fontSize: 9,
-              letterSpacing: '0.15em', cursor: 'pointer',
+              fontFamily: 'monospace', fontWeight: 700,
+              fontSize: i === 3 ? 16 : 9,
+              letterSpacing: i === 3 ? 0 : '0.15em',
+              cursor: 'pointer',
             }}
           >{label}</button>
         ))}
