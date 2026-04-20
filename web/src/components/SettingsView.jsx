@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { getApiKey, setApiKey } from '../anthropic'
 
+const ROLL_RATES = [
+  { label: 'FAST',      ms: 150  },
+  { label: 'MEDIUM',    ms: 500  },
+  { label: 'SLOW',      ms: 1200 },
+  { label: 'VERY SLOW', ms: 2500 },
+]
+
 function Row({ label, children }) {
   return (
     <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '16px' }}>
@@ -15,11 +22,19 @@ function Row({ label, children }) {
 export default function SettingsView() {
   const [key, setKey] = useState(getApiKey)
   const [saved, setSaved] = useState(false)
+  const [rollMs, setRollMs] = useState(
+    () => parseInt(localStorage.getItem('rollRefreshMs') || '500')
+  )
 
   function save() {
     setApiKey(key.trim())
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  function selectRollRate(ms) {
+    setRollMs(ms)
+    localStorage.setItem('rollRefreshMs', ms)
   }
 
   const hasKey = key.trim().length > 0
@@ -34,6 +49,30 @@ export default function SettingsView() {
           SETTINGS
         </span>
       </div>
+
+      {/* Roll refresh rate */}
+      <Row label="ROLL REFRESH RATE">
+        <div style={{ display: 'flex', gap: 8 }}>
+          {ROLL_RATES.map(({ label, ms }) => (
+            <button
+              key={ms}
+              onClick={() => selectRollRate(ms)}
+              style={{
+                flex: 1, padding: '10px 4px',
+                background: rollMs === ms ? '#fff' : 'transparent',
+                border: `1px solid rgba(255,255,255,${rollMs === ms ? 1 : 0.25})`,
+                color: rollMs === ms ? '#000' : 'rgba(255,255,255,0.55)',
+                fontFamily: 'monospace', fontWeight: 700, fontSize: 10,
+                letterSpacing: '0.05em', cursor: 'pointer',
+              }}
+            >{label}</button>
+          ))}
+        </div>
+        <div style={{ marginTop: 8, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>
+          Controls how often the roll number updates on the Racing screen.
+          Slower = smoother but less responsive.
+        </div>
+      </Row>
 
       {/* API Key */}
       <Row label="ANTHROPIC API KEY">
@@ -68,7 +107,7 @@ export default function SettingsView() {
           {saved ? '✓  SAVED' : 'SAVE KEY'}
         </button>
         <div style={{ marginTop: 10, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)', lineHeight: 1.7 }}>
-          Get your key at console.anthropic.com — it's stored locally on this device only and used solely for the Race Area wind analysis.
+          Get your key at console.anthropic.com — stored locally on this device only.
         </div>
       </Row>
 

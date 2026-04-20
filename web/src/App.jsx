@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useWindData } from './useWindData'
 import PreStartView from './components/PreStartView'
 import RaceAreaView from './components/RaceAreaView'
@@ -19,6 +19,19 @@ const TABS = [
 function App() {
   const { wind, samples, speedBuckets } = useWindData()
   const [tab, setTab] = useState(0)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.()
+        .then(() => setIsFullscreen(true))
+        .catch(() => {})
+    } else {
+      document.exitFullscreen?.()
+        .then(() => setIsFullscreen(false))
+        .catch(() => {})
+    }
+  }, [])
 
   return (
     <div style={{
@@ -55,6 +68,17 @@ function App() {
             }}
           >{short}</button>
         ))}
+        {/* Fullscreen toggle */}
+        <button
+          onClick={toggleFullscreen}
+          title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          style={{
+            width: 36, background: '#000', border: 'none',
+            borderLeft: '1px solid rgba(255,255,255,0.12)',
+            color: 'rgba(255,255,255,0.35)', fontSize: 14,
+            cursor: 'pointer', padding: 0, flexShrink: 0,
+          }}
+        >{isFullscreen ? '⊠' : '⛶'}</button>
       </div>
 
       <style>{`

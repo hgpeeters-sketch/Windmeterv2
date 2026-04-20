@@ -15,7 +15,6 @@ function distToLine(boat, p1, p2) {
   return Math.round((bx * ay - by * ax) / len)
 }
 
-// True bearing (degrees) from GPS point A to point B
 function bearingTo(from, to) {
   const toRad = d => d * Math.PI / 180
   const toDeg = r => r * 180 / Math.PI
@@ -26,7 +25,6 @@ function bearingTo(from, to) {
   return ((toDeg(Math.atan2(y, x)) % 360) + 360) % 360
 }
 
-// Normalise angle difference to [-180, 180]
 function angleDiff(a, b) {
   let d = a - b
   while (d >  180) d -= 360
@@ -56,18 +54,33 @@ function fitFontSize(text, W, H, weight = '900') {
   return fs
 }
 
+const TOTAL = 5 * 60
+
 export default function StartSequenceView({ onTimerEnd, wind }) {
-  const [remaining, setRemaining] = useState(5 * 60)
+  const [remaining, setRemaining] = useState(TOTAL)
   const [running, setRunning]     = useState(false)
   const [time, setTime]           = useState('')
 
   // GPS
   const [boatPos, setBoatPos]     = useState(null)
-  const [committee, setCommittee] = useState(null)
-  const [pin, setPin]             = useState(null)
   const [gpsError, setGpsError]   = useState(null)
 
-  // Auto-fit for countdown
+  // GPS pings — persisted across tab switches via localStorage
+  const [committee, setCommittee] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('sl_committee')) } catch { return null }
+  })
+  const [pin, setPin] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('sl_pin')) } catch { return null }
+  })
+
+  // Refs for reliable timer (avoids stale-closure issues with useEffect deps)
+  const runningRef      = useRef(false)
+  const remainingRef    = useRef(TOTAL)
+  const intervalRef     = useRef(null)
+  const onTimerEndRef   = useRef(onTimerEnd)
+  useEffect(() => { onTimerEndRef.current = onTimerEnd }, [onTimerEnd])
+
+  // Auto-fit for countdown display
   const countdownRef = useRef(null)
   const [countdownFs, setCountdownFs] = useState(100)
 
@@ -77,21 +90,21 @@ export default function StartSequenceView({ onTimerEnd, wind }) {
     tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
   }, [])
 
-  // Countdown
+  // Single interval, runs for the lifetime of the component
   useEffect(() => {
-    if (!running) return
-    const id = setInterval(() => {
-      setRemaining(r => {
-        if (r <= 1) {
-          setRunning(false)
-          setTimeout(() => onTimerEnd?.(), 800)
-          return 0
-        }
-        return r - 1
-      })
+    intervalRef.current = setInterval(() => {
+      if (!runningRef.current) return
+      const r = remainingRef.current - 1
+      remainingRef.current = r
+      setRemaining(r)
+      if (r <= 0) {
+        runningRef.current = false
+        setRunning(false)
+        setTimeout(() => onTimerEndRef.current?.(), 800)
+      }
     }, 1000)
-    return () => clearInterval(id)
-  }, [running, onTimerEnd])
+    return () => clearInterval(intervalRef.current)
+  }, [])
 
   // GPS watch
   useEffect(() => {
@@ -113,71 +126,90 @@ export default function StartSequenceView({ onTimerEnd, wind }) {
 
   useEffect(() => {
     const el = countdownRef.current; if (!el) return
-    const compute = () => { const {clientWidth:W,clientHeight:H}=el; if(W&&H) setCountdownFs(fitFontSize(countdownText,W*0.88,H*0.48)) }
+    const compute = () => {
+      const { clientWidth: W, clientHeight: H } = el
+      if (W && H) setCountdownFs(fitFontSize(countdownText, W * 0.88, H * 0.48))
+    }
     const ro = new ResizeObserver(compute); ro.observe(el); compute()
     return () => ro.disconnect()
   }, [countdownText])
 
+  function handleStartStop() {
+    if (remaining === 0) return
+    const next = !runningRef.current
+    runningRef.current = next
+    setRunning(next)
+  }
+
+  function handleReset() {
+    runningRef.current = false
+    remainingRef.current = TOTAL
+    setRunning(false)
+    setRemaining(TOTAL)
+  }
+
   function sync() {
-    setRemaining(r => {
-      const secs = r % 60
-      return secs > 30 ? r + (60 - secs) : r - secs
-    })
+    const r = remainingRef.current
+    const secs = r % 60
+    const next = secs > 30 ? r + (60 - secs) : r - secs
+    remainingRef.current = next
+    setRemaining(next)
   }
 
   function ping(end) {
     if (!boatPos) return
-    if (end === 'committee') setCommittee({ ...boatPos })
-    else setPin({ ...boatPos })
+    const pos = { ...boatPos }
+    if (end === 'committee') {
+      setCommittee(pos)
+      localStorage.setItem('sl_committee', JSON.stringify(pos))
+    } else {
+      setPin(pos)
+      localStorage.setItem('sl_pin', JSON.stringify(pos))
+    }
   }
 
   const lineDist = (boatPos && committee && pin)
     ? distToLine(boatPos, committee, pin)
     : null
 
-  // Line bias: bearing from pin to committee vs square-to-wind line (TWD + 90)
   let lineBias = null, biasEnd = null
   if (pin && committee && wind) {
-    const lb  = bearingTo(pin, committee)
-    const sq  = (wind.direction + 90 + 360) % 360
-    lineBias  = angleDiff(lb, sq)
-    biasEnd   = lineBias > 0 ? 'PIN' : 'COMM'
+    const lb = bearingTo(pin, committee)
+    const sq = (wind.direction + 90 + 360) % 360
+    lineBias = angleDiff(lb, sq)
+    biasEnd  = lineBias > 0 ? 'PIN' : 'COMM'
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-      {/* Row 0: Header — dark, flex 1 */}
+      {/* Row 0: Header */}
       <div style={{ flex: 1, minHeight: 0, background: BG(0), display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px' }}>
         <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)' }}>START SEQUENCE</span>
         <span style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>{time}</span>
       </div>
 
-      {/* Row 1: Countdown — light, flex 3 */}
+      {/* Row 1: Countdown */}
       <div ref={countdownRef} style={{ flex: 3, minHeight: 0, background: BG(1), display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 14 }}>
-        <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(1)},0.35)` }}>
-          COUNTDOWN
-        </span>
+        <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(1)},0.35)` }}>COUNTDOWN</span>
         <span style={{
-          fontSize: countdownFs,
-          fontWeight: 900, fontFamily: 'monospace',
+          fontSize: countdownFs, fontWeight: 900, fontFamily: 'monospace',
           color: started ? `rgba(${RGB(1)},0.3)` : FG(1),
-          lineHeight: 1,
-          fontVariantNumeric: 'tabular-nums',
+          lineHeight: 1, fontVariantNumeric: 'tabular-nums',
           letterSpacing: urgent ? '0.05em' : '-0.02em',
         }}>
           {countdownText}
         </span>
         <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
-          <Btn onClick={() => setRunning(r => !r)} primary={!running && !started} fg={FG(1)} rgb={RGB(1)}>
+          <Btn onClick={handleStartStop} primary={!running && !started} fg={FG(1)} rgb={RGB(1)}>
             {running ? 'PAUSE' : started ? 'DONE' : 'START'}
           </Btn>
-          <Btn onClick={() => { setRunning(false); setRemaining(5 * 60) }} fg={FG(1)} rgb={RGB(1)}>RESET</Btn>
-          <Btn onClick={sync} fg={FG(1)} rgb={RGB(1)}>SYNC</Btn>
+          <Btn onClick={handleReset} fg={FG(1)} rgb={RGB(1)}>RESET</Btn>
+          <Btn onClick={sync}        fg={FG(1)} rgb={RGB(1)}>SYNC</Btn>
         </div>
       </div>
 
-      {/* Row 2: Line distance — dark, flex 2.5 */}
+      {/* Row 2: Line distance + ping */}
       <div style={{ flex: 2.5, minHeight: 0, background: BG(2), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 14px', gap: 10 }}>
         <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(2)},0.4)` }}>DISTANCE TO START LINE</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -190,7 +222,6 @@ export default function StartSequenceView({ onTimerEnd, wind }) {
             </span>
           )}
         </div>
-        {/* Ping buttons — always tappable to re-ping */}
         <div style={{ display: 'flex', gap: 8 }}>
           <PingBtn label="COMMITTEE" pinged={!!committee} onClick={() => ping('committee')} noGps={!boatPos} />
           <PingBtn label="PIN END"   pinged={!!pin}       onClick={() => ping('pin')}       noGps={!boatPos} />
@@ -198,16 +229,14 @@ export default function StartSequenceView({ onTimerEnd, wind }) {
         {gpsError && <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>GPS: {gpsError}</span>}
       </div>
 
-      {/* Row 3: Line bias — light, flex 2 */}
+      {/* Row 3: Line bias */}
       <div style={{ flex: 2, minHeight: 0, background: BG(3), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 14px', gap: 6 }}>
         <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(3)},0.4)` }}>LINE BIAS</span>
         {lineBias !== null ? (
           <>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-              <span style={{ fontSize: 'clamp(36px, 8vh, 64px)', fontWeight: 900, fontFamily: 'monospace', color: FG(3), lineHeight: 1, letterSpacing: '-0.02em' }}>
-                {biasEnd} {Math.abs(lineBias).toFixed(1)}°
-              </span>
-            </div>
+            <span style={{ fontSize: 'clamp(36px, 8vh, 64px)', fontWeight: 900, fontFamily: 'monospace', color: FG(3), lineHeight: 1, letterSpacing: '-0.02em' }}>
+              {biasEnd} {Math.abs(lineBias).toFixed(1)}°
+            </span>
             <span style={{ fontSize: 11, fontFamily: 'monospace', color: `rgba(${RGB(3)},0.5)` }}>
               {biasEnd === 'PIN' ? 'Port / pin end favoured' : 'Starboard / committee end favoured'}
               {Math.abs(lineBias) < 2 ? ' — nearly square' : Math.abs(lineBias) >= 10 ? ' — strongly' : ''}
@@ -232,8 +261,7 @@ function Btn({ children, onClick, primary, fg, rgb }) {
       border: `1px solid rgba(${rgb},0.35)`,
       color: primary ? BG_from(rgb) : `rgba(${rgb},0.8)`,
       fontFamily: 'monospace', fontWeight: 700, fontSize: 14,
-      letterSpacing: '0.1em', cursor: 'pointer',
-      minWidth: 90,
+      letterSpacing: '0.1em', cursor: 'pointer', minWidth: 90,
     }}>{children}</button>
   )
 }

@@ -204,8 +204,13 @@ export default function DashboardView() {
   const [gpsError, setGpsError]     = useState(null)
   const lastSample                  = useRef(0)
   const rollSmoothed                = useRef(null)
+  const rollLastUpdate              = useRef(0)
+  const rollRefreshMs               = useRef(parseInt(localStorage.getItem('rollRefreshMs') || '500'))
 
   function applyRoll(rawHeel) {
+    const now = Date.now()
+    if (now - rollLastUpdate.current < rollRefreshMs.current) return
+    rollLastUpdate.current = now
     const clamped  = Math.max(-ROLL_CLAMP, Math.min(ROLL_CLAMP, rawHeel))
     const smoothed = rollSmoothed.current === null
       ? clamped
