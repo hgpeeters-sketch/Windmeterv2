@@ -1,4 +1,2 @@
 import SwiftUI
-
-// Kept for backwards compatibility — use SmallInstrument directly in new code.
-typealias DataTileView = SmallInstrument
+// Superseded by InstrumentTileView — kept so the Xcode project file compiles unchanged.
