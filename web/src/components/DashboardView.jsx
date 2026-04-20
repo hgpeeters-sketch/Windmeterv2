@@ -188,22 +188,38 @@ function RollTile({ roll, onRequestPerms }) {
 const ROLL_ALPHA = 0.18
 const ROLL_CLAMP = 45
 
-export default function DashboardView() {
-  const [cog, setCog]           = useState(null)
-  const [cogHistory, setCogHistory] = useState([])
-  const [roll, setRoll]         = useState(null)
-  const [time, setTime]         = useState('')
-  const [gpsError, setGpsError] = useState(null)
-  const lastSample              = useRef(0)
-  const rollSmoothed            = useRef(null)
+// Pure lateral heel from accelerometer: acc.x is left/right in portrait iPhone.
+// Unlike gamma (Euler angle), this is unaffected by fore-aft pitch because
+// pitching only redistributes gravity between acc.y and acc.z, not acc.x.
+function computeHeel(x, y, z) {
+  const g = Math.sqrt(x * x + y * y + z * z) || 9.81
+  return Math.asin(Math.max(-1, Math.min(1, x / g))) * 180 / Math.PI
+}
 
-  function applyRoll(gamma) {
-    const clamped  = Math.max(-ROLL_CLAMP, Math.min(ROLL_CLAMP, gamma))
+export default function DashboardView() {
+  const [cog, setCog]               = useState(null)
+  const [cogHistory, setCogHistory] = useState([])
+  const [roll, setRoll]             = useState(null)
+  const [time, setTime]             = useState('')
+  const [gpsError, setGpsError]     = useState(null)
+  const lastSample                  = useRef(0)
+  const rollSmoothed                = useRef(null)
+
+  function applyRoll(rawHeel) {
+    const clamped  = Math.max(-ROLL_CLAMP, Math.min(ROLL_CLAMP, rawHeel))
     const smoothed = rollSmoothed.current === null
       ? clamped
       : rollSmoothed.current + ROLL_ALPHA * (clamped - rollSmoothed.current)
     rollSmoothed.current = smoothed
     setRoll(parseFloat(smoothed.toFixed(1)))
+  }
+
+  function listenMotion() {
+    window.addEventListener('devicemotion', e => {
+      const acc = e.accelerationIncludingGravity
+      if (!acc || acc.x === null) return
+      applyRoll(computeHeel(acc.x, acc.y, acc.z))
+    })
   }
 
   // Clock
@@ -230,23 +246,18 @@ export default function DashboardView() {
     return () => navigator.geolocation.clearWatch(id)
   }, [])
 
-  // Device orientation → Roll (gamma = left/right heel in portrait)
+  // Device motion → Roll (lateral heel only, pitch-independent)
   useEffect(() => {
-    if (typeof DeviceOrientationEvent !== 'undefined' &&
-        typeof DeviceOrientationEvent.requestPermission !== 'function') {
-      window.addEventListener('deviceorientation', e => {
-        if (e.gamma !== null) applyRoll(e.gamma)
-      })
+    if (typeof DeviceMotionEvent !== 'undefined' &&
+        typeof DeviceMotionEvent.requestPermission !== 'function') {
+      listenMotion()
     }
   }, [])
 
-  function requestOrientation() {
-    if (typeof DeviceOrientationEvent?.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission().then(s => {
-        if (s === 'granted') window.addEventListener('deviceorientation', e => {
-          if (e.gamma !== null) applyRoll(e.gamma)
-        })
-      })
+  async function requestOrientation() {
+    if (typeof DeviceMotionEvent?.requestPermission === 'function') {
+      const s = await DeviceMotionEvent.requestPermission()
+      if (s === 'granted') listenMotion()
     }
   }
 
