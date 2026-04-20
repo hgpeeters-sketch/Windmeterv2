@@ -33,7 +33,7 @@ function App() {
         {tab === 0 && <PreStartView wind={wind} samples={samples} speedBuckets={speedBuckets} />}
         {tab === 1 && <RaceAreaView wind={wind} samples={samples} speedBuckets={speedBuckets} />}
         {tab === 2 && <CourseAnalysisView wind={wind} samples={samples} />}
-        {tab === 3 && <StartSequenceView wind={wind} />}
+        {tab === 3 && <StartSequenceView wind={wind} onTimerEnd={() => setTab(4)} />}
         {tab === 4 && <DashboardView wind={wind} />}
         {tab === 5 && <SettingsView />}
       </div>

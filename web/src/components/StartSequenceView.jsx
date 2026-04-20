@@ -25,7 +25,19 @@ const BG  = i => i % 2 === 0 ? '#000' : '#fff'
 const FG  = i => i % 2 === 0 ? '#fff' : '#000'
 const RGB = i => i % 2 === 0 ? '255,255,255' : '0,0,0'
 
-export default function StartSequenceView() {
+function fitFontSize(text, W, H, weight = '900') {
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  let fs = Math.floor(H * 0.88)
+  while (fs > 20) {
+    ctx.font = `${weight} ${fs}px monospace`
+    if (ctx.measureText(text).width <= W - 8) break
+    fs -= 2
+  }
+  return fs
+}
+
+export default function StartSequenceView({ onTimerEnd }) {
   const [remaining, setRemaining] = useState(5 * 60)
   const [running, setRunning]     = useState(false)
   const [time, setTime]           = useState('')
@@ -41,6 +53,14 @@ export default function StartSequenceView() {
   const [roll, setRoll]       = useState(null)
   const [orientPerms, setOrientPerms] = useState('unknown')
 
+  // Auto-fit font sizes
+  const countdownRef = useRef(null)
+  const sogRef       = useRef(null)
+  const rollRef      = useRef(null)
+  const [countdownFs, setCountdownFs] = useState(100)
+  const [sogFs, setSogFs]             = useState(60)
+  const [rollFs, setRollFs]           = useState(60)
+
   // Clock
   useEffect(() => {
     const tick = () => setTime(new Date().toTimeString().slice(0, 8))
@@ -52,12 +72,16 @@ export default function StartSequenceView() {
     if (!running) return
     const id = setInterval(() => {
       setRemaining(r => {
-        if (r <= 0) { setRunning(false); return 0 }
+        if (r <= 1) {
+          setRunning(false)
+          setTimeout(() => onTimerEnd?.(), 800)
+          return 0
+        }
         return r - 1
       })
     }, 1000)
     return () => clearInterval(id)
-  }, [running])
+  }, [running, onTimerEnd])
 
   // GPS watch
   useEffect(() => {
@@ -101,6 +125,33 @@ export default function StartSequenceView() {
     }
   }, [])
 
+  const started = remaining === 0
+  const urgent  = remaining <= 60 && running
+  const countdownText = started ? 'GO' : fmt(remaining)
+  const sogText = sog !== null ? sog.toFixed(1) : '—'
+  const rollText = roll !== null ? `${roll >= 0 ? '+' : ''}${Number(roll).toFixed(1)}°` : '—°'
+
+  useEffect(() => {
+    const el = countdownRef.current; if (!el) return
+    const compute = () => { const {clientWidth:W,clientHeight:H}=el; if(W&&H) setCountdownFs(fitFontSize(countdownText,W*0.88,H*0.55)) }
+    const ro = new ResizeObserver(compute); ro.observe(el); compute()
+    return () => ro.disconnect()
+  }, [countdownText])
+
+  useEffect(() => {
+    const el = sogRef.current; if (!el) return
+    const compute = () => { const {clientWidth:W,clientHeight:H}=el; if(W&&H) setSogFs(fitFontSize(sogText,W*0.65,H*0.72)) }
+    const ro = new ResizeObserver(compute); ro.observe(el); compute()
+    return () => ro.disconnect()
+  }, [sogText])
+
+  useEffect(() => {
+    const el = rollRef.current; if (!el) return
+    const compute = () => { const {clientWidth:W,clientHeight:H}=el; if(W&&H) setRollFs(fitFontSize(rollText,W*0.65,H*0.72)) }
+    const ro = new ResizeObserver(compute); ro.observe(el); compute()
+    return () => ro.disconnect()
+  }, [rollText])
+
   function sync() {
     setRemaining(r => {
       const secs = r % 60
@@ -118,9 +169,6 @@ export default function StartSequenceView() {
     ? distToLine(boatPos, committee, pin)
     : null
 
-  const urgent  = remaining <= 60 && running
-  const started = remaining === 0
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
@@ -131,20 +179,20 @@ export default function StartSequenceView() {
       </div>
 
       {/* Row 1: Countdown — light, flex 3 */}
-      <div style={{ flex: 3, minHeight: 0, background: BG(1), display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
+      <div ref={countdownRef} style={{ flex: 3, minHeight: 0, background: BG(1), display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
         <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(1)},0.35)` }}>
           COUNTDOWN
         </span>
         {/* Timer display */}
         <span style={{
-          fontSize: 'clamp(60px, 16vh, 130px)',
+          fontSize: countdownFs,
           fontWeight: 900, fontFamily: 'monospace',
           color: started ? `rgba(${RGB(1)},0.3)` : FG(1),
           lineHeight: 1,
           fontVariantNumeric: 'tabular-nums',
           letterSpacing: urgent ? '0.05em' : '-0.02em',
         }}>
-          {started ? 'GO' : fmt(remaining)}
+          {countdownText}
         </span>
         {/* Buttons */}
         <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
@@ -178,20 +226,20 @@ export default function StartSequenceView() {
       </div>
 
       {/* Row 3: SOG — light, flex 1.5 */}
-      <div style={{ flex: 1.5, minHeight: 0, background: BG(3), position: 'relative', display: 'flex', alignItems: 'center', padding: '0 14px' }}>
+      <div ref={sogRef} style={{ flex: 1.5, minHeight: 0, background: BG(3), position: 'relative', display: 'flex', alignItems: 'center', padding: '0 14px' }}>
         <span style={{ position: 'absolute', top: 6, left: 10, fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(3)},0.4)` }}>SOG</span>
-        <span style={{ fontSize: 'clamp(36px, 8vh, 72px)', fontWeight: 900, fontFamily: 'monospace', color: FG(3), lineHeight: 1 }}>
-          {sog !== null ? sog.toFixed(1) : '—'}
+        <span style={{ fontSize: sogFs, fontWeight: 900, fontFamily: 'monospace', color: FG(3), lineHeight: 1, letterSpacing: '-0.02em' }}>
+          {sogText}
         </span>
         <span style={{ position: 'absolute', bottom: 8, right: 10, fontSize: 12, fontFamily: 'monospace', color: `rgba(${RGB(3)},0.4)` }}>KTS</span>
       </div>
 
       {/* Row 4: Roll — dark, flex 1.5 */}
-      <div style={{ flex: 1.5, minHeight: 0, background: BG(4 % 2 === 0 ? 4 : 4), position: 'relative', display: 'flex', alignItems: 'center', padding: '0 14px' }}>
+      <div ref={rollRef} style={{ flex: 1.5, minHeight: 0, background: BG(4), position: 'relative', display: 'flex', alignItems: 'center', padding: '0 14px' }}>
         <span style={{ position: 'absolute', top: 6, left: 10, fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(255,255,255,0.4)` }}>ROLL</span>
         {roll !== null ? (
-          <span style={{ fontSize: 'clamp(36px, 8vh, 72px)', fontWeight: 900, fontFamily: 'monospace', color: '#fff', lineHeight: 1 }}>
-            {roll >= 0 ? '+' : ''}{Number(roll).toFixed(1)}°
+          <span style={{ fontSize: rollFs, fontWeight: 900, fontFamily: 'monospace', color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>
+            {rollText}
           </span>
         ) : (
           <button onClick={requestOrientation} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace', fontSize: 11, padding: '8px 14px', cursor: 'pointer', letterSpacing: '0.1em' }}>

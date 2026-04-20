@@ -11,13 +11,79 @@ function timeFormatted(s) {
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
 }
 
+function fitFontSize(text, W, H, weight = '900') {
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  let fs = Math.floor(H * 0.88)
+  while (fs > 20) {
+    ctx.font = `${weight} ${fs}px monospace`
+    if (ctx.measureText(text).width <= W - 8) break
+    fs -= 2
+  }
+  return fs
+}
+
 // ── Stat box ───────────────────────────────────────────────────────
 function StatBox({ top, value, bottom, half }) {
+  const containerRef = useRef(null)
+  const [fontSize, setFontSize] = useState(44)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const compute = () => {
+      const { clientWidth: W, clientHeight: H } = el
+      if (W && H) setFontSize(fitFontSize(value, W * (half ? 0.85 : 0.75), H * 0.55))
+    }
+    const ro = new ResizeObserver(compute)
+    ro.observe(el); compute()
+    return () => ro.disconnect()
+  }, [value, half])
+
   return (
-    <div style={{ flex: half ? 1 : undefined, padding: '16px 0', textAlign: 'center', borderRight: half ? '1px solid rgba(255,255,255,0.12)' : undefined }}>
+    <div ref={containerRef} style={{ flex: half ? 1 : undefined, padding: '12px 0', textAlign: 'center', borderRight: half ? '1px solid rgba(255,255,255,0.12)' : undefined }}>
       <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>{top}</div>
-      <div style={{ fontSize: 44, fontWeight: 700, fontFamily: 'monospace', color: '#fff', lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize, fontWeight: 900, fontFamily: 'monospace', color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>{value}</div>
       <div style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{bottom}</div>
+    </div>
+  )
+}
+
+function LiveWindRow({ wind }) {
+  const twdRef = useRef(null)
+  const twsRef = useRef(null)
+  const [twdFs, setTwdFs] = useState(52)
+  const [twsFs, setTwsFs] = useState(52)
+  const twdText = `${wind.direction}°`
+  const twsText = (wind.speedMps * 1.94384).toFixed(1)
+
+  useEffect(() => {
+    const el = twdRef.current; if (!el) return
+    const compute = () => { const {clientWidth:W,clientHeight:H}=el; if(W&&H) setTwdFs(fitFontSize(twdText,W*0.75,H*0.72)) }
+    const ro = new ResizeObserver(compute); ro.observe(el); compute()
+    return () => ro.disconnect()
+  }, [twdText])
+
+  useEffect(() => {
+    const el = twsRef.current; if (!el) return
+    const compute = () => { const {clientWidth:W,clientHeight:H}=el; if(W&&H) setTwsFs(fitFontSize(twsText,W*0.85,H*0.72)) }
+    const ro = new ResizeObserver(compute); ro.observe(el); compute()
+    return () => ro.disconnect()
+  }, [twsText])
+
+  return (
+    <div style={{ display: 'flex', background: '#000' }}>
+      <div ref={twdRef} style={{ flex: 1, padding: '10px 0 8px 16px' }}>
+        <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>TWD</div>
+        <span style={{ fontSize: twdFs, fontWeight: 900, fontFamily: 'monospace', color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>{twdText}</span>
+        <span style={{ fontSize: Math.max(14, twdFs * 0.38), fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)', marginLeft: 8 }}>{compassLabel(wind.direction)}</span>
+      </div>
+      <div style={{ width: 1, background: 'rgba(255,255,255,0.12)' }} />
+      <div ref={twsRef} style={{ flex: 1, padding: '10px 0 8px 16px' }}>
+        <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>TWS</div>
+        <span style={{ fontSize: twsFs, fontWeight: 900, fontFamily: 'monospace', color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>{twsText}</span>
+        <span style={{ fontSize: Math.max(12, twsFs * 0.32), fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)', marginLeft: 6 }}>KTS</span>
+      </div>
     </div>
   )
 }
@@ -93,20 +159,7 @@ export default function RaceAreaView({ wind, samples, speedBuckets }) {
   )
 
   // ── Live wind row ─────────────────────────────────────────────
-  const liveWind = (
-    <div style={{ display: 'flex', background: '#000' }}>
-      <div style={{ flex: 1, padding: '10px 0 8px 16px' }}>
-        <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>TWD</div>
-        <span style={{ fontSize: 52, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>{wind.direction}°</span>
-        <span style={{ fontSize: 20, fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)', marginLeft: 8 }}>{compassLabel(wind.direction)}</span>
-      </div>
-      <div style={{ width: 1, background: 'rgba(255,255,255,0.12)' }} />
-      <div style={{ flex: 1, padding: '10px 0 8px 16px' }}>
-        <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>TWS</div>
-        <span style={{ fontSize: 52, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>{(wind.speedMps * 1.94384).toFixed(1)}</span>
-      </div>
-    </div>
-  )
+  const liveWind = <LiveWindRow wind={wind} />
 
   // ── Phases ───────────────────────────────────────────────────
   let body

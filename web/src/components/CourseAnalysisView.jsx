@@ -155,14 +155,39 @@ const BG  = i => i % 2 === 0 ? '#000' : '#fff'
 const FG  = i => i % 2 === 0 ? '#fff' : '#000'
 const RGB = i => i % 2 === 0 ? '255,255,255' : '0,0,0'
 
+function fitFontSize(text, W, H, weight = '900') {
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  let fs = Math.floor(H * 0.88)
+  while (fs > 20) {
+    ctx.font = `${weight} ${fs}px monospace`
+    if (ctx.measureText(text).width <= W - 8) break
+    fs -= 2
+  }
+  return fs
+}
+
 export default function CourseAnalysisView({ wind, samples }) {
   const [mark, setMark] = useState(() => parseInt(localStorage.getItem('markBearing') || '0'))
   const [time, setTime] = useState('')
+  const markContainerRef = useRef(null)
+  const [markFs, setMarkFs] = useState(80)
 
   useEffect(() => {
     const tick = () => setTime(new Date().toTimeString().slice(0, 8))
     tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
   }, [])
+
+  const markText = `${String(mark).padStart(3, '0')}°`
+  useEffect(() => {
+    const el = markContainerRef.current; if (!el) return
+    const compute = () => {
+      const { clientWidth: W, clientHeight: H } = el
+      if (W && H) setMarkFs(fitFontSize(markText, W - 8, H * 0.8))
+    }
+    const ro = new ResizeObserver(compute); ro.observe(el); compute()
+    return () => ro.disconnect()
+  }, [markText])
 
   function changeMark(delta) {
     setMark(m => {
@@ -194,9 +219,9 @@ export default function CourseAnalysisView({ wind, samples }) {
         {/* – button */}
         <button onPointerDown={() => changeMark(-1)} style={{ height: '100%', width: 56, background: 'transparent', border: 'none', borderRight: `1px solid rgba(${RGB(1)},0.15)`, fontSize: 32, fontWeight: 300, color: `rgba(${RGB(1)},0.5)`, cursor: 'pointer', flexShrink: 0 }}>−</button>
         {/* Value */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: 'clamp(50px, 13vh, 110px)', fontWeight: 900, fontFamily: 'monospace', color: FG(1), lineHeight: 1 }}>
-            {String(mark).padStart(3, '0')}°
+        <div ref={markContainerRef} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+          <span style={{ fontSize: markFs, fontWeight: 900, fontFamily: 'monospace', color: FG(1), lineHeight: 1, letterSpacing: '-0.02em' }}>
+            {markText}
           </span>
         </div>
         {/* + button */}
@@ -246,10 +271,18 @@ export default function CourseAnalysisView({ wind, samples }) {
 
 function Cell({ label, value, color, light }) {
   const rgb = light ? '255,255,255' : '0,0,0'
+  const containerRef = useRef(null)
+  const [fs, setFs] = useState(24)
+  useEffect(() => {
+    const el = containerRef.current; if (!el) return
+    const compute = () => { const {clientWidth:W,clientHeight:H}=el; if(W&&H) setFs(fitFontSize(value,W*0.85,H*0.6)) }
+    const ro = new ResizeObserver(compute); ro.observe(el); compute()
+    return () => ro.disconnect()
+  }, [value])
   return (
-    <div style={{ flex: 1, textAlign: 'center' }}>
+    <div ref={containerRef} style={{ flex: 1, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.15em', color: `rgba(${rgb},0.35)`, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 'clamp(18px, 3.5vh, 30px)', fontWeight: 700, fontFamily: 'monospace', color: color || `rgba(${rgb},0.9)` }}>{value}</div>
+      <div style={{ fontSize: fs, fontWeight: 900, fontFamily: 'monospace', color: color || `rgba(${rgb},0.9)`, lineHeight: 1, letterSpacing: '-0.02em' }}>{value}</div>
     </div>
   )
 }
