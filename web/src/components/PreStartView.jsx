@@ -10,23 +10,9 @@ function convertSpeed(mps, unit) {
   return mps
 }
 
-// even index = dark, odd = light
-const BG = i => i % 2 === 0 ? '#000' : '#fff'
-const FG = i => i % 2 === 0 ? '#fff' : '#000'
-const FGRGB = i => i % 2 === 0 ? '255,255,255' : '0,0,0'
-
-function RowLabel({ text, idx, extra }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-      <span style={{
-        fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.15em',
-        color: `rgba(${FGRGB(idx)},0.35)`,
-        padding: '6px 0 3px 16px', display: 'block',
-      }}>{text}</span>
-      {extra}
-    </div>
-  )
-}
+const BG   = i => i % 2 === 0 ? '#000' : '#fff'
+const FG   = i => i % 2 === 0 ? '#fff' : '#000'
+const RGB  = i => i % 2 === 0 ? '255,255,255' : '0,0,0'
 
 export default function PreStartView({ wind, samples, speedBuckets }) {
   const [unit, setUnit] = useState('KTS')
@@ -45,70 +31,101 @@ export default function PreStartView({ wind, samples, speedBuckets }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-      {/* Row 0: Header — flex 1 (half height of content rows) */}
+      {/* Row 0: Header — flex 1 (half of content rows) */}
       <div style={{
         flex: 1, minHeight: 0, background: BG(0),
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px',
+        padding: '0 16px', flexShrink: 0,
       }}>
-        <span style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.25em', color: `rgba(${FGRGB(0)},0.4)` }}>
-          PRE-START
-        </span>
-        <span style={{ fontSize: '3.5vh', fontWeight: 700, fontFamily: 'monospace', color: FG(0), fontVariantNumeric: 'tabular-nums' }}>
-          {time}
-        </span>
+        <span style={{
+          fontSize: 'min(5vh, 10vw)', fontWeight: 700,
+          fontFamily: 'monospace', letterSpacing: '0.2em',
+          color: `rgba(${RGB(0)},0.5)`,
+        }}>PRE-START</span>
+        <span style={{
+          fontSize: 'min(5vh, 10vw)', fontWeight: 700,
+          fontFamily: 'monospace', color: FG(0),
+          fontVariantNumeric: 'tabular-nums',
+        }}>{time}</span>
       </div>
 
-      {/* Row 1: TWD — flex 2 */}
-      <div style={{ flex: 2, minHeight: 0, background: BG(1), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 0 0 16px' }}>
-        <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.15em', color: `rgba(${FGRGB(1)},0.35)`, marginBottom: 4 }}>
-          TWD
-        </span>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-          <span style={{ fontSize: '10vh', fontWeight: 700, fontFamily: 'monospace', color: FG(1), lineHeight: 1 }}>
-            {wind.direction}°
-          </span>
-          <span style={{ fontSize: '4vh', fontFamily: 'monospace', color: `rgba(${FGRGB(1)},0.4)` }}>
-            {compassLabel(wind.direction)}
-          </span>
+      {/* Row 1: TWD — flex 2, number fills the box */}
+      <div style={{ flex: 2, minHeight: 0, background: BG(1), position: 'relative', overflow: 'hidden' }}>
+        {/* Label overlay top-left */}
+        <span style={{
+          position: 'absolute', top: 8, left: 16,
+          fontSize: 'min(2vh, 14px)', fontFamily: 'monospace', letterSpacing: '0.2em',
+          color: `rgba(${RGB(1)},0.35)`, zIndex: 1,
+        }}>TWD</span>
+        {/* Big number centred */}
+        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', paddingLeft: 12 }}>
+          <span style={{
+            fontSize: 'min(18vh, 42vw)', fontWeight: 700,
+            fontFamily: 'monospace', color: FG(1), lineHeight: 1,
+          }}>{wind.direction}°</span>
         </div>
+        {/* Compass label bottom-right */}
+        <span style={{
+          position: 'absolute', bottom: 10, right: 16,
+          fontSize: 'min(5vh, 10vw)', fontFamily: 'monospace',
+          color: `rgba(${RGB(1)},0.4)`,
+        }}>{compassLabel(wind.direction)}</span>
       </div>
 
       {/* Row 2: Oscillation chart — flex 2 */}
       <div style={{ flex: 2, minHeight: 0, background: BG(2), display: 'flex', flexDirection: 'column' }}>
-        <RowLabel text="WIND SHIFT  (° FROM MEAN)" idx={2} />
+        <span style={{
+          flexShrink: 0, padding: '7px 0 3px 16px',
+          fontSize: 'min(1.8vh, 13px)', fontFamily: 'monospace', letterSpacing: '0.15em',
+          color: `rgba(${RGB(2)},0.35)`,
+        }}>WIND SHIFT  (° FROM MEAN)</span>
         <div style={{ flex: 1, minHeight: 0 }}>
           <OscillationChart samples={samples} foreground={FG(2)} />
         </div>
       </div>
 
-      {/* Row 3: TWS — flex 2 */}
-      <div style={{ flex: 2, minHeight: 0, background: BG(3), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 0 0 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-          <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.15em', color: `rgba(${FGRGB(3)},0.35)` }}>
-            TWS
-          </span>
-          <div style={{ flex: 1 }} />
+      {/* Row 3: TWS — flex 2, number fills the box */}
+      <div style={{ flex: 2, minHeight: 0, background: BG(3), position: 'relative', overflow: 'hidden' }}>
+        {/* Label + unit toggle overlay top */}
+        <div style={{
+          position: 'absolute', top: 8, left: 0, right: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 16px', zIndex: 1,
+        }}>
+          <span style={{
+            fontSize: 'min(2vh, 14px)', fontFamily: 'monospace', letterSpacing: '0.2em',
+            color: `rgba(${RGB(3)},0.35)`,
+          }}>TWS</span>
           <button onClick={cycleUnit} style={{
-            marginRight: 16, padding: '3px 7px',
-            background: 'transparent', border: `1px solid rgba(${FGRGB(3)},0.28)`,
-            color: `rgba(${FGRGB(3)},0.7)`, fontFamily: 'monospace', fontSize: 11, fontWeight: 700,
+            padding: '3px 8px', background: 'transparent',
+            border: `1px solid rgba(${RGB(3)},0.28)`,
+            color: `rgba(${RGB(3)},0.7)`,
+            fontFamily: 'monospace', fontSize: 11, fontWeight: 700,
             cursor: 'pointer', borderRadius: 4,
           }}>{unit}</button>
         </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-          <span style={{ fontSize: '10vh', fontWeight: 700, fontFamily: 'monospace', color: FG(3), lineHeight: 1 }}>
-            {spd}
-          </span>
-          <span style={{ fontSize: '3.5vh', fontFamily: 'monospace', color: `rgba(${FGRGB(3)},0.35)` }}>
-            {unit}
-          </span>
+        {/* Big number */}
+        <div style={{ height: '100%', display: 'flex', alignItems: 'center', paddingLeft: 12 }}>
+          <span style={{
+            fontSize: 'min(18vh, 42vw)', fontWeight: 700,
+            fontFamily: 'monospace', color: FG(3), lineHeight: 1,
+          }}>{spd}</span>
         </div>
+        {/* Unit bottom-right */}
+        <span style={{
+          position: 'absolute', bottom: 10, right: 16,
+          fontSize: 'min(5vh, 10vw)', fontFamily: 'monospace',
+          color: `rgba(${RGB(3)},0.4)`,
+        }}>{unit}</span>
       </div>
 
       {/* Row 4: Speed history — flex 2 */}
       <div style={{ flex: 2, minHeight: 0, background: BG(4), display: 'flex', flexDirection: 'column' }}>
-        <RowLabel text="WIND SPEED  (30 MIN, 3 MIN BARS)" idx={4} />
+        <span style={{
+          flexShrink: 0, padding: '7px 0 3px 16px',
+          fontSize: 'min(1.8vh, 13px)', fontFamily: 'monospace', letterSpacing: '0.15em',
+          color: `rgba(${RGB(4)},0.35)`,
+        }}>WIND SPEED  (30 MIN · 3 MIN BARS)</span>
         <div style={{ flex: 1, minHeight: 0 }}>
           <SpeedHistoryChart buckets={speedBuckets} unit={unit} foreground={FG(4)} />
         </div>
