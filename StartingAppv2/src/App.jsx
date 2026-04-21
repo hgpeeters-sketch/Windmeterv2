@@ -195,7 +195,7 @@ function App() {
             onSync={handleTimerSync}
           />
         )}
-        {tab === 4 && <DashboardView />}
+        {tab === 4 && <DashboardView wind={wind} />}
         {tab === 5 && <SettingsView />}
       </div>
 

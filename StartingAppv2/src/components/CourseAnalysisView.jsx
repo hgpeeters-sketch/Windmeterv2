@@ -169,9 +169,9 @@ function fitFontSize(text, W, H, weight = '900') {
 }
 
 export default function CourseAnalysisView({ wind, samples }) {
-  const stored = localStorage.getItem('markBearing')
-  const [mark, setMark] = useState(stored !== null ? parseInt(stored) : Math.round(wind.direction))
-  const markDefaulted = useRef(stored !== null)
+  const twd = localStorage.getItem('v2_manualTwd')
+  const [mark, setMark] = useState(twd !== null ? parseInt(twd) : Math.round(wind.direction))
+  const markDefaulted = useRef(twd !== null)
   const [time, setTime] = useState('')
   const markContainerRef = useRef(null)
   const [markFs, setMarkFs] = useState(80)
@@ -206,11 +206,7 @@ export default function CourseAnalysisView({ wind, samples }) {
 
   function changeMark(delta) {
     markDefaulted.current = true
-    setMark(m => {
-      const v = ((m + delta) % 360 + 360) % 360
-      localStorage.setItem('markBearing', v)
-      return v
-    })
+    setMark(m => ((m + delta) % 360 + 360) % 360)
   }
 
   const result = analyze(samples, mark)

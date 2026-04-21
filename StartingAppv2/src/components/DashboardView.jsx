@@ -4,7 +4,6 @@ const BG  = i => i % 2 === 0 ? '#000' : '#fff'
 const FG  = i => i % 2 === 0 ? '#fff' : '#000'
 const RGB = i => i % 2 === 0 ? '255,255,255' : '0,0,0'
 
-// Auto-fit font size using canvas measurement (same as BigTile in PreStartView)
 function fitFontSize(text, W, H, weight = '900') {
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')
@@ -17,7 +16,6 @@ function fitFontSize(text, W, H, weight = '900') {
   return fs
 }
 
-// COG trend sparkline — line chart of COG over last few minutes
 function CogChart({ history }) {
   const containerRef = useRef(null)
   const canvasRef = useRef(null)
@@ -39,10 +37,8 @@ function CogChart({ history }) {
       const minV = Math.min(...values) - 2
       const maxV = Math.max(...values) + 2
       const range = maxV - minV || 1
-
       const toY = v => H - ((v - minV) / range) * (H - 8) - 4
 
-      // Mean line
       const mean = values.reduce((a, b) => a + b, 0) / values.length
       const meanY = toY(mean)
       ctx.setLineDash([3, 3])
@@ -50,11 +46,9 @@ function CogChart({ history }) {
       ctx.beginPath(); ctx.moveTo(0, meanY); ctx.lineTo(W, meanY); ctx.stroke()
       ctx.setLineDash([])
 
-      // Mean label
       ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '8px monospace'; ctx.textAlign = 'right'
       ctx.fillText(`${mean.toFixed(0)}°`, W - 2, meanY - 3)
 
-      // COG line
       ctx.beginPath()
       history.forEach((pt, i) => {
         const x = (i / (history.length - 1)) * W
@@ -64,13 +58,11 @@ function CogChart({ history }) {
       ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2
       ctx.lineJoin = 'round'; ctx.stroke()
 
-      // Current dot
       const last = history[history.length - 1]
       ctx.beginPath()
       ctx.arc(W, toY(last.cog), 4, 0, Math.PI * 2)
       ctx.fillStyle = '#fff'; ctx.fill()
 
-      // Time labels
       ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '8px monospace'
       ctx.textAlign = 'left';  ctx.fillText('oldest', 2, H - 2)
       ctx.textAlign = 'right'; ctx.fillText('now', W - 2, H - 2)
@@ -89,7 +81,6 @@ function CogChart({ history }) {
   )
 }
 
-// COG tile: big number top half, trend chart bottom half
 function CogTile({ cog, history, gpsError }) {
   const containerRef = useRef(null)
   const [fontSize, setFontSize] = useState(80)
@@ -107,7 +98,6 @@ function CogTile({ cog, history, gpsError }) {
     return () => ro.disconnect()
   }, [text])
 
-  // Trend: compare last third vs first third of history
   let trend = null
   if (history.length >= 6) {
     const n = history.length
@@ -125,13 +115,11 @@ function CogTile({ cog, history, gpsError }) {
           {trend > 0.5 ? `▲ +${trend.toFixed(1)}°` : trend < -0.5 ? `▼ ${trend.toFixed(1)}°` : '— STEADY'}
         </span>
       )}
-      {/* Big number — top 52% */}
       <div style={{ height: '52%', display: 'flex', alignItems: 'center', paddingLeft: 6 }}>
         <span style={{ fontSize, fontWeight: 900, fontFamily: 'monospace', color: FG(1), lineHeight: 1, letterSpacing: '-0.02em' }}>
           {text}
         </span>
       </div>
-      {/* Trend chart — bottom 48% */}
       <div style={{ height: '48%', borderTop: `1px solid rgba(${RGB(1)},0.12)`, background: BG(0), position: 'relative' }}>
         {history.length >= 2
           ? <CogChart history={history} />
@@ -144,11 +132,17 @@ function CogTile({ cog, history, gpsError }) {
   )
 }
 
-// Roll tile: big number + PORT/STBD/LEVEL. Tap tile to trigger iOS permission dialog.
-function RollTile({ roll, onTap }) {
+// Roll tile: shows leeward-corrected value when tack is known, otherwise raw roll.
+// leewardRoll convention: negative = leeward (heel to leeward side), positive = windward
+function RollTile({ roll, leewardRoll, onTap }) {
   const containerRef = useRef(null)
   const [fontSize, setFontSize] = useState(80)
-  const text = roll !== null ? `${roll >= 0 ? '+' : ''}${Number(roll).toFixed(1)}°` : '—°'
+
+  const hasTack   = leewardRoll !== null
+  const displayVal = hasTack ? leewardRoll : roll
+  const text = displayVal !== null
+    ? `${displayVal >= 0 ? '+' : ''}${Number(displayVal).toFixed(1)}°`
+    : '—°'
 
   useEffect(() => {
     const el = containerRef.current
@@ -162,7 +156,12 @@ function RollTile({ roll, onTap }) {
     return () => ro.disconnect()
   }, [text])
 
-  const side = roll === null ? null : roll > 1 ? 'PORT' : roll < -1 ? 'STBD' : 'LEVEL'
+  let side = null
+  if (hasTack && displayVal !== null) {
+    side = Math.abs(leewardRoll) <= 1 ? 'LEVEL' : leewardRoll < -1 ? 'LEEWARD' : 'WINDWARD'
+  } else if (!hasTack && roll !== null) {
+    side = roll > 1 ? 'PORT' : roll < -1 ? 'STBD' : 'LEVEL'
+  }
 
   return (
     <div ref={containerRef} onClick={onTap} style={{ flex: 3, minHeight: 0, background: BG(2), position: 'relative', overflow: 'hidden', cursor: roll === null ? 'pointer' : 'default' }}>
@@ -171,10 +170,16 @@ function RollTile({ roll, onTap }) {
         <span style={{ position: 'absolute', top: 6, right: 10, fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.12em', color: `rgba(${RGB(2)},0.3)`, zIndex: 1 }}>TAP TO ACTIVATE</span>
       )}
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', paddingLeft: 6 }}>
-        <span style={{ fontSize, fontWeight: 900, fontFamily: 'monospace', color: roll === null ? `rgba(${RGB(2)},0.2)` : FG(2), lineHeight: 1, letterSpacing: '-0.02em' }}>{text}</span>
+        <span style={{ fontSize, fontWeight: 900, fontFamily: 'monospace', color: roll === null ? `rgba(${RGB(2)},0.2)` : FG(2), lineHeight: 1, letterSpacing: '-0.02em' }}>
+          {text}
+        </span>
       </div>
       {side && (
-        <span style={{ position: 'absolute', bottom: 8, right: 10, fontSize: 'clamp(14px,3vh,26px)', fontFamily: 'monospace', fontWeight: 700, color: `rgba(${RGB(2)},0.45)` }}>
+        <span style={{
+          position: 'absolute', bottom: 8, right: 10,
+          fontSize: 'clamp(14px,3vh,26px)', fontFamily: 'monospace', fontWeight: 700,
+          color: side === 'LEVEL' ? `rgba(${RGB(2)},0.6)` : `rgba(${RGB(2)},0.45)`,
+        }}>
           {side}
         </span>
       )}
@@ -182,19 +187,15 @@ function RollTile({ roll, onTap }) {
   )
 }
 
-// EMA smoothing + clamp for roll — isolates heel from dynamic boat motion
 const ROLL_ALPHA = 0.18
 const ROLL_CLAMP = 45
 
-// Pure lateral heel from accelerometer: acc.x is left/right in portrait iPhone.
-// Unlike gamma (Euler angle), this is unaffected by fore-aft pitch because
-// pitching only redistributes gravity between acc.y and acc.z, not acc.x.
 function computeHeel(x, y, z) {
   const g = Math.sqrt(x * x + y * y + z * z) || 9.81
   return Math.asin(Math.max(-1, Math.min(1, x / g))) * 180 / Math.PI
 }
 
-export default function DashboardView() {
+export default function DashboardView({ wind }) {
   const [cog, setCog]               = useState(null)
   const [cogHistory, setCogHistory] = useState([])
   const [roll, setRoll]             = useState(null)
@@ -225,13 +226,11 @@ export default function DashboardView() {
     })
   }
 
-  // Clock
   useEffect(() => {
     const tick = () => setTime(new Date().toTimeString().slice(0, 8))
     tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
   }, [])
 
-  // GPS → COG
   useEffect(() => {
     if (!navigator.geolocation) { setGpsError('GPS not available'); return }
     const id = navigator.geolocation.watchPosition(pos => {
@@ -249,9 +248,6 @@ export default function DashboardView() {
     return () => navigator.geolocation.clearWatch(id)
   }, [])
 
-  // Device motion → Roll (lateral heel only, pitch-independent)
-  // On non-iOS: starts immediately. On iOS: tries auto-request on mount (works if
-  // permission was already granted or browser allows it); fallback is tapping the roll tile.
   useEffect(() => {
     if (typeof DeviceMotionEvent === 'undefined') return
     if (typeof DeviceMotionEvent.requestPermission !== 'function') {
@@ -273,20 +269,28 @@ export default function DashboardView() {
     }
   }
 
+  // Compute tack-aware leeward roll.
+  // On starboard tack (twa < 180): heel to port is leeward → leewardRoll = -roll (so negative = leeward)
+  // On port tack (twa >= 180): heel to starboard is leeward → leewardRoll = roll (negative = starboard = leeward)
+  let leewardRoll = null
+  const twd = wind?.direction ?? null
+  if (roll !== null && twd !== null && cog !== null) {
+    const twa = ((twd - cog) + 360) % 360
+    leewardRoll = twa < 180 ? -roll : roll
+    leewardRoll = parseFloat(leewardRoll.toFixed(1))
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-      {/* Header */}
       <div style={{ flex: 1, minHeight: 0, background: BG(0), display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px' }}>
         <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)' }}>RACING</span>
         <span style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>{time}</span>
       </div>
 
-      {/* COG + trend */}
       <CogTile cog={cog} history={cogHistory} gpsError={gpsError} />
 
-      {/* Roll */}
-      <RollTile roll={roll} onTap={handleRollTap} />
+      <RollTile roll={roll} leewardRoll={leewardRoll} onTap={handleRollTap} />
 
     </div>
   )

@@ -17,7 +17,6 @@ function fitFontSize(text, W, H, weight = '900') {
   return fs
 }
 
-// Canvas chart of manually logged wind directions, with angle unwrapping
 function WindHistoryChart({ samples }) {
   const containerRef = useRef(null)
   const canvasRef    = useRef(null)
@@ -45,7 +44,6 @@ function WindHistoryChart({ samples }) {
         return
       }
 
-      // Unwrap angles to keep chart continuous
       const dirs = [recent[0].direction]
       for (let i = 1; i < recent.length; i++) {
         let d = recent[i].direction - dirs[i - 1]
@@ -61,7 +59,6 @@ function WindHistoryChart({ samples }) {
       const toY   = v => H - ((v - minV) / range) * (H - 16) - 8
       const toX   = i => recent.length === 1 ? W / 2 : (i / (recent.length - 1)) * (W - PAD_R)
 
-      // Cardinal guide lines
       for (let base = -360; base <= 720; base += 90) {
         if (base < minV - 30 || base > maxV + 30) continue
         const y = toY(base)
@@ -83,7 +80,6 @@ function WindHistoryChart({ samples }) {
         ctx.lineJoin = 'round'; ctx.stroke()
       }
 
-      // Dots
       dirs.forEach((v, i) => {
         const x = toX(i), y = toY(v)
         const isLast = i === dirs.length - 1
@@ -97,7 +93,6 @@ function WindHistoryChart({ samples }) {
         }
       })
 
-      // Time axis
       const t0 = recent[0].time, t1 = recent[recent.length - 1].time
       const fmt = ms => { const m = Math.round((ms - t0) / 60_000); return m === 0 ? 'now' : `${m}m` }
       ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = '8px monospace'
@@ -124,9 +119,28 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
   const [fs, setFs] = useState(80)
   const [time, setTime] = useState('')
 
+  const [boatPos, setBoatPos]     = useState(null)
+  const [gpsError, setGpsError]   = useState(null)
+  const [committee, setCommittee] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('sl_committee')) } catch { return null }
+  })
+  const [pin, setPin] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('sl_pin')) } catch { return null }
+  })
+
   useEffect(() => {
     const tick = () => setTime(new Date().toTimeString().slice(0, 8))
     tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    if (!navigator.geolocation) { setGpsError('GPS not available'); return }
+    const id = navigator.geolocation.watchPosition(
+      pos => { setBoatPos({ lat: pos.coords.latitude, lon: pos.coords.longitude }); setGpsError(null) },
+      err => setGpsError(err.message),
+      { enableHighAccuracy: true, maximumAge: 2000 }
+    )
+    return () => navigator.geolocation.clearWatch(id)
   }, [])
 
   const draftText = `${String(draft).padStart(3, '0')}°`
@@ -135,7 +149,7 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
     const el = containerRef.current; if (!el) return
     const compute = () => {
       const { clientWidth: W, clientHeight: H } = el
-      if (W && H) setFs(fitFontSize(draftText, W - 120, H * 0.75))
+      if (W && H) setFs(fitFontSize(draftText, W - 160, H * 0.75))
     }
     const ro = new ResizeObserver(compute); ro.observe(el); compute()
     return () => ro.disconnect()
@@ -145,8 +159,22 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
     setDraft(d => ((d + delta) % 360 + 360) % 360)
   }
 
-  function log() {
-    logWindDir(draft)
+  function ping(end) {
+    if (!boatPos) return
+    const pos = { ...boatPos }
+    if (end === 'committee') {
+      setCommittee(pos); localStorage.setItem('sl_committee', JSON.stringify(pos))
+    } else {
+      setPin(pos); localStorage.setItem('sl_pin', JSON.stringify(pos))
+    }
+  }
+
+  function resetEnd(end) {
+    if (end === 'committee') {
+      setCommittee(null); localStorage.removeItem('sl_committee')
+    } else {
+      setPin(null); localStorage.removeItem('sl_pin')
+    }
   }
 
   const lastLogged = samples.length ? samples[samples.length - 1] : null
@@ -154,13 +182,11 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-      {/* Header — dark */}
       <div style={{ flexShrink: 0, height: 36, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px' }}>
         <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)' }}>RACE AREA</span>
         <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>{time}</span>
       </div>
 
-      {/* Wind direction input — white tile, flex 2 */}
       <div ref={containerRef} style={{ flex: 2, minHeight: 0, background: '#fff', position: 'relative', display: 'flex', alignItems: 'center' }}>
         <span style={{ position: 'absolute', top: 6, left: 10, fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.2em', color: 'rgba(0,0,0,0.4)' }}>
           WIND DIRECTION (TWD)
@@ -169,28 +195,22 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
           {compassLabel(draft)}
         </span>
 
-        {/* –10 */}
-        <button onPointerDown={() => change(-10)} style={adjBtn('#fff', '0,0,0')}>−10</button>
-        {/* −1 */}
-        <button onPointerDown={() => change(-1)}  style={adjBtn('#fff', '0,0,0', true)}>−1</button>
+        <button onPointerDown={() => change(-10)} style={adjBtn()}>−10</button>
+        <button onPointerDown={() => change(-1)}  style={adjBtn()}>−1</button>
 
-        {/* Big number */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
           <span style={{ fontSize: fs, fontWeight: 900, fontFamily: 'monospace', color: '#000', lineHeight: 1, letterSpacing: '-0.02em' }}>
             {draftText}
           </span>
         </div>
 
-        {/* +1 */}
-        <button onPointerDown={() => change(+1)}  style={adjBtn('#fff', '0,0,0', true)}>+1</button>
-        {/* +10 */}
-        <button onPointerDown={() => change(+10)} style={adjBtn('#fff', '0,0,0')}>+10</button>
+        <button onPointerDown={() => change(+1)}  style={adjBtn()}>+1</button>
+        <button onPointerDown={() => change(+10)} style={adjBtn()}>+10</button>
       </div>
 
-      {/* LOG button — dark strip */}
       <div style={{ flexShrink: 0, background: '#000', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.1)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <button
-          onClick={log}
+          onClick={() => logWindDir(draft)}
           style={{
             flex: 1, padding: '14px 0',
             background: '#fff', border: 'none', color: '#000',
@@ -209,7 +229,29 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
         </div>
       </div>
 
-      {/* History chart — dark, fills remaining space */}
+      {/* Start line ping section */}
+      <div style={{ flexShrink: 0, background: '#000', borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <LineEndRow
+          label="COMMITTEE"
+          pinged={!!committee}
+          noGps={!boatPos}
+          onPing={() => ping('committee')}
+          onReset={() => resetEnd('committee')}
+        />
+        <LineEndRow
+          label="PIN END"
+          pinged={!!pin}
+          noGps={!boatPos}
+          onPing={() => ping('pin')}
+          onReset={() => resetEnd('pin')}
+        />
+        {(gpsError || (!boatPos && !gpsError)) && (
+          <span style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.22)', marginTop: 1 }}>
+            {gpsError ? `GPS: ${gpsError}` : 'Acquiring GPS…'}
+          </span>
+        )}
+      </div>
+
       <div style={{ flex: 3, minHeight: 0, background: '#000', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flexShrink: 0, padding: '4px 0 0 10px', fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.3)' }}>
           TWD HISTORY  (last 35 min)
@@ -223,13 +265,48 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
   )
 }
 
-function adjBtn(bg, rgb, narrow = false) {
+function LineEndRow({ label, pinged, noGps, onPing, onReset }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', width: 68, flexShrink: 0 }}>
+        {label}
+        {pinged && <span style={{ color: 'rgba(255,255,255,0.55)', marginLeft: 4 }}>✓</span>}
+      </span>
+      <button
+        onClick={onPing}
+        disabled={noGps}
+        style={{
+          flex: 1, padding: '7px 0',
+          background: pinged ? 'rgba(255,255,255,0.12)' : 'transparent',
+          border: `1px solid rgba(255,255,255,${noGps ? 0.1 : pinged ? 0.45 : 0.22})`,
+          color: `rgba(255,255,255,${noGps ? 0.18 : pinged ? 0.85 : 0.55})`,
+          fontFamily: 'monospace', fontSize: 10, fontWeight: 700,
+          letterSpacing: '0.1em', cursor: noGps ? 'default' : 'pointer',
+        }}
+      >PING</button>
+      <button
+        onClick={onReset}
+        disabled={!pinged}
+        style={{
+          padding: '7px 14px', flexShrink: 0,
+          background: 'transparent',
+          border: `1px solid rgba(255,255,255,${!pinged ? 0.08 : 0.22})`,
+          color: `rgba(255,255,255,${!pinged ? 0.15 : 0.42})`,
+          fontFamily: 'monospace', fontSize: 10, fontWeight: 700,
+          letterSpacing: '0.08em', cursor: !pinged ? 'default' : 'pointer',
+        }}
+      >RESET</button>
+    </div>
+  )
+}
+
+function adjBtn() {
   return {
-    height: '100%', width: narrow ? 44 : 54,
+    height: '100%', width: 38, flexShrink: 0,
     background: 'transparent', border: 'none',
-    borderRight: `1px solid rgba(${rgb},0.15)`,
-    borderLeft: `1px solid rgba(${rgb},0.15)`,
-    fontSize: 14, fontWeight: 700, fontFamily: 'monospace',
-    color: `rgba(${rgb},0.55)`, cursor: 'pointer', flexShrink: 0,
+    borderRight: '1px solid rgba(0,0,0,0.15)',
+    borderLeft: '1px solid rgba(0,0,0,0.15)',
+    fontSize: 12, fontWeight: 700, fontFamily: 'monospace',
+    color: 'rgba(0,0,0,0.55)', cursor: 'pointer',
   }
 }

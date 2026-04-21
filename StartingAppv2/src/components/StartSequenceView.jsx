@@ -52,21 +52,22 @@ function fitFontSize(text, W, H, weight = '900') {
   return fs
 }
 
-// Timer state + controls come from App so the timer keeps running across tab switches
 export default function StartSequenceView({ wind, remaining, running, onStartStop, onReset, onSync }) {
-  const [time, setTime]         = useState('')
-  const [boatPos, setBoatPos]   = useState(null)
-  const [gpsError, setGpsError] = useState(null)
+  const [time, setTime]       = useState('')
+  const [boatPos, setBoatPos] = useState(null)
 
-  const [committee, setCommittee] = useState(() => {
+  // Read line ends from localStorage (set by RaceAreaView)
+  const [committee] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sl_committee')) } catch { return null }
   })
-  const [pin, setPin] = useState(() => {
+  const [pin] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sl_pin')) } catch { return null }
   })
 
   const countdownRef = useRef(null)
   const [countdownFs, setCountdownFs] = useState(100)
+  const distRef = useRef(null)
+  const [distFs, setDistFs] = useState(60)
 
   useEffect(() => {
     const tick = () => setTime(new Date().toTimeString().slice(0, 8))
@@ -74,10 +75,10 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
   }, [])
 
   useEffect(() => {
-    if (!navigator.geolocation) { setGpsError('GPS not available'); return }
+    if (!navigator.geolocation) return
     const id = navigator.geolocation.watchPosition(
-      pos => { setBoatPos({ lat: pos.coords.latitude, lon: pos.coords.longitude }); setGpsError(null) },
-      err => setGpsError(err.message),
+      pos => setBoatPos({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      () => {},
       { enableHighAccuracy: true, maximumAge: 2000 }
     )
     return () => navigator.geolocation.clearWatch(id)
@@ -97,17 +98,18 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
     return () => ro.disconnect()
   }, [countdownText])
 
-  function ping(end) {
-    if (!boatPos) return
-    const pos = { ...boatPos }
-    if (end === 'committee') {
-      setCommittee(pos); localStorage.setItem('sl_committee', JSON.stringify(pos))
-    } else {
-      setPin(pos); localStorage.setItem('sl_pin', JSON.stringify(pos))
-    }
-  }
-
   const lineDist = (boatPos && committee && pin) ? distToLine(boatPos, committee, pin) : null
+  const distText = lineDist === null ? '—' : `${lineDist > 0 ? '+' : ''}${lineDist} m`
+
+  useEffect(() => {
+    const el = distRef.current; if (!el) return
+    const compute = () => {
+      const { clientWidth: W, clientHeight: H } = el
+      if (W && H) setDistFs(fitFontSize(distText, W * 0.88, H * 0.52))
+    }
+    const ro = new ResizeObserver(compute); ro.observe(el); compute()
+    return () => ro.disconnect()
+  }, [distText])
 
   let lineBias = null, biasEnd = null
   if (pin && committee && wind) {
@@ -144,23 +146,28 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
         </div>
       </div>
 
-      <div style={{ flex: 2.5, minHeight: 0, background: BG(2), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 14px', gap: 10 }}>
+      {/* Distance to line — enlarged now that ping buttons are in AREA tab */}
+      <div ref={distRef} style={{ flex: 3, minHeight: 0, background: BG(2), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 14px', gap: 6 }}>
         <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(2)},0.4)` }}>DISTANCE TO START LINE</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: 'clamp(32px, 7vh, 58px)', fontWeight: 900, fontFamily: 'monospace', color: lineDist === null ? 'rgba(255,255,255,0.2)' : lineDist > 0 ? '#fff' : 'rgba(255,255,255,0.6)', lineHeight: 1 }}>
-            {lineDist === null ? 'PING BOTH ENDS' : `${lineDist > 0 ? '+' : ''}${lineDist} m`}
+        <span style={{
+          fontSize: distFs, fontWeight: 900, fontFamily: 'monospace', lineHeight: 1,
+          color: lineDist === null
+            ? `rgba(${RGB(2)},0.2)`
+            : lineDist > 0 ? FG(2) : `rgba(${RGB(2)},0.65)`,
+          letterSpacing: '-0.02em',
+        }}>
+          {distText}
+        </span>
+        {lineDist !== null && (
+          <span style={{ fontSize: 11, fontFamily: 'monospace', color: `rgba(${RGB(2)},0.5)` }}>
+            {lineDist > 0 ? 'OVER LINE' : 'BEHIND LINE'}
           </span>
-          {lineDist !== null && (
-            <span style={{ fontSize: 10, fontFamily: 'monospace', color: lineDist > 0 ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.35)' }}>
-              {lineDist > 0 ? 'OVER LINE' : 'BEHIND LINE'}
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <PingBtn label="COMMITTEE" pinged={!!committee} onClick={() => ping('committee')} noGps={!boatPos} />
-          <PingBtn label="PIN END"   pinged={!!pin}       onClick={() => ping('pin')}       noGps={!boatPos} />
-        </div>
-        {gpsError && <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>GPS: {gpsError}</span>}
+        )}
+        {lineDist === null && (
+          <span style={{ fontSize: 10, fontFamily: 'monospace', color: `rgba(${RGB(2)},0.25)`, letterSpacing: '0.08em' }}>
+            PING BOTH ENDS IN AREA TAB
+          </span>
+        )}
       </div>
 
       <div style={{ flex: 2, minHeight: 0, background: BG(3), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 14px', gap: 6 }}>
@@ -196,21 +203,6 @@ function Btn({ children, onClick, primary, fg, rgb }) {
       fontFamily: 'monospace', fontWeight: 700, fontSize: 14,
       letterSpacing: '0.1em', cursor: 'pointer', minWidth: 90,
     }}>{children}</button>
-  )
-}
-
-function PingBtn({ label, pinged, onClick, noGps }) {
-  return (
-    <button onClick={onClick} disabled={noGps} style={{
-      padding: '10px 12px', flex: 1,
-      background: pinged ? 'rgba(255,255,255,0.15)' : 'transparent',
-      border: `1px solid rgba(255,255,255,${pinged ? 0.5 : 0.2})`,
-      color: `rgba(255,255,255,${noGps ? 0.2 : pinged ? 0.9 : 0.55})`,
-      fontFamily: 'monospace', fontSize: 11, fontWeight: 700,
-      letterSpacing: '0.1em', cursor: noGps ? 'default' : 'pointer',
-    }}>
-      {pinged ? '✓ ' : ''}{label}{pinged ? ' ↺' : ''}
-    </button>
   )
 }
 
