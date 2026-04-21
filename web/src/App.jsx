@@ -149,7 +149,7 @@ function App() {
   return (
     <div style={{
       background: '#000',
-      width: '100vw', height: '100vh',
+      width: '100%', height: '100%',
       display: 'flex', flexDirection: 'column',
       fontFamily: 'monospace',
       maxWidth: 430,
@@ -229,7 +229,7 @@ function App() {
 
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #111; }
+        html, body, #root { height: 100%; overflow: hidden; background: #000; }
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>
