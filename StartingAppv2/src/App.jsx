@@ -153,6 +153,26 @@ function App() {
     localStorage.setItem('sl_remaining', next)
   }
 
+  // ── Screen Wake Lock — keeps display on while app is active ─────────
+  const wakeLockRef = useRef(null)
+  const [wakeLockOn, setWakeLockOn] = useState(false)
+
+  async function acquireWakeLock() {
+    if (!('wakeLock' in navigator)) return
+    try {
+      wakeLockRef.current = await navigator.wakeLock.request('screen')
+      setWakeLockOn(true)
+      wakeLockRef.current.addEventListener('release', () => setWakeLockOn(false))
+    } catch {}
+  }
+
+  useEffect(() => {
+    acquireWakeLock()
+    const onVisible = () => { if (document.visibilityState === 'visible') acquireWakeLock() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+
   // ── Fullscreen ────────────────────────────────────────────────────────
   const toggleFullscreen = useCallback(() => {
     if (isIOS) {
@@ -216,16 +236,21 @@ function App() {
             }}
           >{short}</button>
         ))}
-        <button
-          onClick={toggleFullscreen}
-          style={{
-            width: 36, background: '#000', border: 'none',
-            borderLeft: '1px solid rgba(255,255,255,0.12)',
-            color: isStandalone ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.35)',
-            fontSize: isIOS ? 11 : 14,
-            cursor: isStandalone ? 'default' : 'pointer', padding: 0, flexShrink: 0,
-          }}
-        >{isIOS ? (isStandalone ? '⊠' : '⛶') : (isFullscreen ? '⊠' : '⛶')}</button>
+        <div style={{ display: 'flex', alignItems: 'center', borderLeft: '1px solid rgba(255,255,255,0.12)', flexShrink: 0 }}>
+          <span title={wakeLockOn ? 'Screen will stay on' : 'Screen lock inactive'} style={{
+            width: 18, textAlign: 'center',
+            fontSize: 7, color: wakeLockOn ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.15)',
+          }}>●</span>
+          <button
+            onClick={toggleFullscreen}
+            style={{
+              width: 30, height: '100%', background: '#000', border: 'none',
+              color: isStandalone ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.35)',
+              fontSize: isIOS ? 11 : 14,
+              cursor: isStandalone ? 'default' : 'pointer', padding: 0,
+            }}
+          >{isIOS ? (isStandalone ? '⊠' : '⛶') : (isFullscreen ? '⊠' : '⛶')}</button>
+        </div>
       </div>
 
       {showIosHint && (
