@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 
-// Perpendicular distance (metres) from boat to start line.
-// Positive = boat is over the line (OCS side), negative = behind.
 function distToLine(boat, p1, p2) {
   const toRad = d => d * Math.PI / 180
   const R = 6371000
@@ -54,18 +52,12 @@ function fitFontSize(text, W, H, weight = '900') {
   return fs
 }
 
-const TOTAL = 5 * 60
+// Timer state + controls come from App so the timer keeps running across tab switches
+export default function StartSequenceView({ wind, remaining, running, onStartStop, onReset, onSync }) {
+  const [time, setTime]         = useState('')
+  const [boatPos, setBoatPos]   = useState(null)
+  const [gpsError, setGpsError] = useState(null)
 
-export default function StartSequenceView({ onTimerEnd, wind }) {
-  const [remaining, setRemaining] = useState(TOTAL)
-  const [running, setRunning]     = useState(false)
-  const [time, setTime]           = useState('')
-
-  // GPS
-  const [boatPos, setBoatPos]     = useState(null)
-  const [gpsError, setGpsError]   = useState(null)
-
-  // GPS pings — persisted across tab switches via localStorage
   const [committee, setCommittee] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sl_committee')) } catch { return null }
   })
@@ -73,55 +65,26 @@ export default function StartSequenceView({ onTimerEnd, wind }) {
     try { return JSON.parse(localStorage.getItem('sl_pin')) } catch { return null }
   })
 
-  // Refs for reliable timer (avoids stale-closure issues with useEffect deps)
-  const runningRef      = useRef(false)
-  const remainingRef    = useRef(TOTAL)
-  const intervalRef     = useRef(null)
-  const onTimerEndRef   = useRef(onTimerEnd)
-  useEffect(() => { onTimerEndRef.current = onTimerEnd }, [onTimerEnd])
-
-  // Auto-fit for countdown display
   const countdownRef = useRef(null)
   const [countdownFs, setCountdownFs] = useState(100)
 
-  // Clock
   useEffect(() => {
     const tick = () => setTime(new Date().toTimeString().slice(0, 8))
     tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
   }, [])
 
-  // Single interval, runs for the lifetime of the component
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      if (!runningRef.current) return
-      const r = remainingRef.current - 1
-      remainingRef.current = r
-      setRemaining(r)
-      if (r <= 0) {
-        runningRef.current = false
-        setRunning(false)
-        setTimeout(() => onTimerEndRef.current?.(), 800)
-      }
-    }, 1000)
-    return () => clearInterval(intervalRef.current)
-  }, [])
-
-  // GPS watch
   useEffect(() => {
     if (!navigator.geolocation) { setGpsError('GPS not available'); return }
     const id = navigator.geolocation.watchPosition(
-      pos => {
-        setBoatPos({ lat: pos.coords.latitude, lon: pos.coords.longitude })
-        setGpsError(null)
-      },
+      pos => { setBoatPos({ lat: pos.coords.latitude, lon: pos.coords.longitude }); setGpsError(null) },
       err => setGpsError(err.message),
       { enableHighAccuracy: true, maximumAge: 2000 }
     )
     return () => navigator.geolocation.clearWatch(id)
   }, [])
 
-  const started = remaining === 0
-  const urgent  = remaining <= 60 && running
+  const started       = remaining === 0
+  const urgent        = remaining <= 60 && running
   const countdownText = started ? 'GO' : fmt(remaining)
 
   useEffect(() => {
@@ -134,43 +97,17 @@ export default function StartSequenceView({ onTimerEnd, wind }) {
     return () => ro.disconnect()
   }, [countdownText])
 
-  function handleStartStop() {
-    if (remaining === 0) return
-    const next = !runningRef.current
-    runningRef.current = next
-    setRunning(next)
-  }
-
-  function handleReset() {
-    runningRef.current = false
-    remainingRef.current = TOTAL
-    setRunning(false)
-    setRemaining(TOTAL)
-  }
-
-  function sync() {
-    const r = remainingRef.current
-    const secs = r % 60
-    const next = secs > 30 ? r + (60 - secs) : r - secs
-    remainingRef.current = next
-    setRemaining(next)
-  }
-
   function ping(end) {
     if (!boatPos) return
     const pos = { ...boatPos }
     if (end === 'committee') {
-      setCommittee(pos)
-      localStorage.setItem('sl_committee', JSON.stringify(pos))
+      setCommittee(pos); localStorage.setItem('sl_committee', JSON.stringify(pos))
     } else {
-      setPin(pos)
-      localStorage.setItem('sl_pin', JSON.stringify(pos))
+      setPin(pos); localStorage.setItem('sl_pin', JSON.stringify(pos))
     }
   }
 
-  const lineDist = (boatPos && committee && pin)
-    ? distToLine(boatPos, committee, pin)
-    : null
+  const lineDist = (boatPos && committee && pin) ? distToLine(boatPos, committee, pin) : null
 
   let lineBias = null, biasEnd = null
   if (pin && committee && wind) {
@@ -183,13 +120,11 @@ export default function StartSequenceView({ onTimerEnd, wind }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-      {/* Row 0: Header */}
       <div style={{ flex: 1, minHeight: 0, background: BG(0), display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px' }}>
         <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)' }}>START SEQUENCE</span>
         <span style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>{time}</span>
       </div>
 
-      {/* Row 1: Countdown */}
       <div ref={countdownRef} style={{ flex: 3, minHeight: 0, background: BG(1), display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 14 }}>
         <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(1)},0.35)` }}>COUNTDOWN</span>
         <span style={{
@@ -201,24 +136,23 @@ export default function StartSequenceView({ onTimerEnd, wind }) {
           {countdownText}
         </span>
         <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
-          <Btn onClick={handleStartStop} primary={!running && !started} fg={FG(1)} rgb={RGB(1)}>
+          <Btn onClick={onStartStop} primary={!running && !started} fg={FG(1)} rgb={RGB(1)}>
             {running ? 'PAUSE' : started ? 'DONE' : 'START'}
           </Btn>
-          <Btn onClick={handleReset} fg={FG(1)} rgb={RGB(1)}>RESET</Btn>
-          <Btn onClick={sync}        fg={FG(1)} rgb={RGB(1)}>SYNC</Btn>
+          <Btn onClick={onReset} fg={FG(1)} rgb={RGB(1)}>RESET</Btn>
+          <Btn onClick={onSync}  fg={FG(1)} rgb={RGB(1)}>SYNC</Btn>
         </div>
       </div>
 
-      {/* Row 2: Line distance + ping */}
       <div style={{ flex: 2.5, minHeight: 0, background: BG(2), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 14px', gap: 10 }}>
         <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(2)},0.4)` }}>DISTANCE TO START LINE</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span style={{ fontSize: 'clamp(32px, 7vh, 58px)', fontWeight: 900, fontFamily: 'monospace', color: lineDist === null ? 'rgba(255,255,255,0.2)' : lineDist > 0 ? '#fff' : 'rgba(255,255,255,0.6)', lineHeight: 1 }}>
-            {lineDist === null ? '—  m' : `${lineDist > 0 ? '+' : ''}${lineDist} m`}
+            {lineDist === null ? 'PING BOTH ENDS' : `${lineDist > 0 ? '+' : ''}${lineDist} m`}
           </span>
           {lineDist !== null && (
             <span style={{ fontSize: 10, fontFamily: 'monospace', color: lineDist > 0 ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.35)' }}>
-              {lineDist > 0 ? '⚠ OVER LINE' : 'BEHIND LINE'}
+              {lineDist > 0 ? 'OVER LINE' : 'BEHIND LINE'}
             </span>
           )}
         </div>
@@ -229,7 +163,6 @@ export default function StartSequenceView({ onTimerEnd, wind }) {
         {gpsError && <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>GPS: {gpsError}</span>}
       </div>
 
-      {/* Row 3: Line bias */}
       <div style={{ flex: 2, minHeight: 0, background: BG(3), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 14px', gap: 6 }}>
         <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(3)},0.4)` }}>LINE BIAS</span>
         {lineBias !== null ? (
