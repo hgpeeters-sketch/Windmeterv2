@@ -4,5 +4,5 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/StartingAppv2/',
+  base: '/Windmeterv2/StartingAppv2/',
 })
