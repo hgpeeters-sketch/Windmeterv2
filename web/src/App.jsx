@@ -36,12 +36,9 @@ function App() {
   const audioCtxRef = useRef(null)
 
   function beep(freq, dur, vol = 0.35, delay = 0) {
+    const ctx = audioCtxRef.current
+    if (!ctx || ctx.state !== 'running') return  // only play when context is unlocked
     try {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)()
-      }
-      const ctx = audioCtxRef.current
-      if (ctx.state === 'suspended') ctx.resume()
       const osc  = ctx.createOscillator()
       const gain = ctx.createGain()
       osc.connect(gain); gain.connect(ctx.destination)
@@ -51,6 +48,21 @@ function App() {
       gain.gain.linearRampToValueAtTime(vol, t + 0.01)
       gain.gain.exponentialRampToValueAtTime(0.001, t + dur)
       osc.start(t); osc.stop(t + dur + 0.05)
+    } catch {}
+  }
+
+  // Must be called from a user gesture to unlock iOS audio
+  function unlockAudio(then) {
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)()
+      }
+      const ctx = audioCtxRef.current
+      if (ctx.state === 'suspended') {
+        ctx.resume().then(then).catch(() => {})
+      } else {
+        then()
+      }
     } catch {}
   }
 
@@ -90,6 +102,10 @@ function App() {
   function handleTimerStartStop() {
     if (remainingRef.current <= 0) return
     const next = !runningRef.current
+    if (next) {
+      // Unlock AudioContext from this user gesture, then play a start confirmation beep
+      unlockAudio(() => beep(660, 0.12, 0.3))
+    }
     runningRef.current = next
     setTimerRunning(next)
   }
