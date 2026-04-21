@@ -4,6 +4,7 @@ import RaceAreaView from './components/RaceAreaView'
 import CourseAnalysisView from './components/CourseAnalysisView'
 import StartSequenceView from './components/StartSequenceView'
 import DashboardView from './components/DashboardView'
+import TrackView from './components/TrackView'
 import SettingsView from './components/SettingsView'
 
 const TABS = [
@@ -11,7 +12,8 @@ const TABS = [
   { label: 'RACE AREA',  short: 'AREA'   },
   { label: 'COURSE',     short: 'COURSE' },
   { label: 'START',      short: 'START'  },
-  { label: 'RACING',     short: 'RACING' },
+  { label: 'RACING',     short: 'RACE'   },
+  { label: 'TRACK',      short: 'TRACK'  },
   { label: '⚙',          short: '⚙',  gear: true },
 ]
 
@@ -120,7 +122,7 @@ function App() {
       if (r <= 0) {
         runningRef.current = false
         setTimerRunning(false)
-        setTimeout(() => setTab(4), 800)
+        setTimeout(() => setTab(5), 800) // switch to TRACK tab at gun
       }
     }, 1000)
     return () => clearInterval(id)
@@ -217,7 +219,8 @@ function App() {
           />
         )}
         {tab === 4 && <DashboardView wind={wind} />}
-        {tab === 5 && <SettingsView />}
+        {tab === 5 && <TrackView remaining={remaining} twd={manualTwd} samples={manualSamples} />}
+        {tab === 6 && <SettingsView />}
       </div>
 
       <div style={{ height: 1, background: 'rgba(255,255,255,0.12)' }} />
