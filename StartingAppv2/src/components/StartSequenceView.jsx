@@ -55,6 +55,9 @@ function fitFontSize(text, W, H, weight = '900') {
 export default function StartSequenceView({ wind, remaining, running, onStartStop, onReset, onSync }) {
   const [time, setTime]       = useState('')
   const [boatPos, setBoatPos] = useState(null)
+  const [notifPerm, setNotifPerm] = useState(() =>
+    'Notification' in window ? Notification.permission : 'unsupported'
+  )
 
   // Read line ends from localStorage (set by RaceAreaView)
   const [committee] = useState(() => {
@@ -64,10 +67,12 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
     try { return JSON.parse(localStorage.getItem('sl_pin')) } catch { return null }
   })
 
-  const countdownRef = useRef(null)
+  const countdownRef    = useRef(null)
   const [countdownFs, setCountdownFs] = useState(100)
-  const distRef = useRef(null)
+  const distRef         = useRef(null)
   const [distFs, setDistFs] = useState(60)
+  const lastNotifDist   = useRef(null)
+  const lastNotifTime   = useRef(0)
 
   useEffect(() => {
     const tick = () => setTime(new Date().toTimeString().slice(0, 8))
@@ -83,6 +88,12 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
     )
     return () => navigator.geolocation.clearWatch(id)
   }, [])
+
+  async function requestNotifPermission() {
+    if (!('Notification' in window)) return
+    const result = await Notification.requestPermission()
+    setNotifPerm(result)
+  }
 
   const started       = remaining === 0
   const urgent        = remaining <= 60 && running
@@ -110,6 +121,27 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
     const ro = new ResizeObserver(compute); ro.observe(el); compute()
     return () => ro.disconnect()
   }, [distText])
+
+  // Push distance to watch via mirrored phone notification.
+  // tag:'line-dist' replaces the previous notification in place (no stacking).
+  // Fires when distance changes by ≥ 3 m AND at least 8 s have elapsed.
+  useEffect(() => {
+    if (lineDist === null || notifPerm !== 'granted') return
+    const now = Date.now()
+    const distChanged = lastNotifDist.current === null || Math.abs(lineDist - lastNotifDist.current) >= 3
+    const timeOk      = now - lastNotifTime.current >= 8000
+    if (!distChanged || !timeOk) return
+    lastNotifDist.current = lineDist
+    lastNotifTime.current = now
+    try {
+      new Notification('Start Line', {
+        body: `${lineDist > 0 ? '+' : ''}${lineDist} m  ${lineDist > 0 ? '▲ OVER LINE' : '▼ BEHIND LINE'}`,
+        tag: 'line-dist',
+        renotify: true,
+        silent: true,
+      })
+    } catch {}
+  }, [lineDist, notifPerm])
 
   let lineBias = null, biasEnd = null
   if (pin && committee && wind) {
@@ -148,7 +180,21 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
 
       {/* Distance to line — enlarged now that ping buttons are in AREA tab */}
       <div ref={distRef} style={{ flex: 3, minHeight: 0, background: BG(2), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 14px', gap: 6 }}>
-        <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(2)},0.4)` }}>DISTANCE TO START LINE</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(2)},0.4)` }}>DISTANCE TO START LINE</span>
+          {notifPerm === 'default' && (
+            <button onClick={requestNotifPermission} style={{
+              padding: '3px 8px', background: 'transparent',
+              border: `1px solid rgba(${RGB(2)},0.25)`,
+              color: `rgba(${RGB(2)},0.5)`,
+              fontFamily: 'monospace', fontSize: 9, fontWeight: 700,
+              letterSpacing: '0.08em', cursor: 'pointer',
+            }}>WATCH ⌚</button>
+          )}
+          {notifPerm === 'granted' && (
+            <span style={{ fontSize: 9, fontFamily: 'monospace', color: `rgba(${RGB(2)},0.35)`, letterSpacing: '0.08em' }}>⌚ WATCH ON</span>
+          )}
+        </div>
         <span style={{
           fontSize: distFs, fontWeight: 900, fontFamily: 'monospace', lineHeight: 1,
           color: lineDist === null
