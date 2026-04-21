@@ -36,7 +36,6 @@ function DirChart({ hours }) {
       const ctx = canvas.getContext('2d')
       ctx.clearRect(0, 0, W * 2, H * 2); ctx.scale(2, 2)
 
-      // Unwrap angles to avoid 359→1 jumps
       const dirs = [hours[0].dir]
       for (let i = 1; i < hours.length; i++) {
         let d = hours[i].dir - dirs[i - 1]
@@ -117,14 +116,35 @@ function BigNum({ value, label, sub }) {
   )
 }
 
+function loadCached() {
+  try {
+    const raw = localStorage.getItem('v2_prestart_result')
+    if (!raw) return null
+    const data = JSON.parse(raw)
+    // Keep results for up to 3 hours
+    if (Date.now() - data.fetchedAt > 3 * 60 * 60 * 1000) return null
+    return data
+  } catch { return null }
+}
+
 export default function PreStartView() {
-  const [query, setQuery]     = useState(() => localStorage.getItem('v2_prestart_city') || '')
-  const [status, setStatus]   = useState('idle')
+  const [query, setQuery]       = useState(() => localStorage.getItem('v2_prestart_city') || '')
+  const [status, setStatus]     = useState('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [location, setLocation] = useState(null)
-  const [current, setCurrent]  = useState(null)
-  const [hours, setHours]      = useState([])
-  const [time, setTime]        = useState('')
+  const [current, setCurrent]   = useState(null)
+  const [hours, setHours]       = useState([])
+  const [time, setTime]         = useState('')
+
+  // Restore cached results on mount (survives tab switches)
+  useEffect(() => {
+    const cached = loadCached()
+    if (!cached) return
+    setLocation(cached.location)
+    setCurrent(cached.hours[0] ?? null)
+    setHours(cached.hours)
+    setStatus('done')
+  }, [])
 
   useEffect(() => {
     const tick = () => setTime(new Date().toTimeString().slice(0, 8))
@@ -142,7 +162,8 @@ export default function PreStartView() {
       if (!geoData.results?.length) { setStatus('error'); setErrorMsg('Location not found'); return }
 
       const { name, latitude, longitude, country, admin1 } = geoData.results[0]
-      setLocation({ name: [name, admin1, country].filter(Boolean).join(', '), lat: latitude, lon: longitude })
+      const loc = { name: [name, admin1, country].filter(Boolean).join(', '), lat: latitude, lon: longitude }
+      setLocation(loc)
 
       const fxRes  = await fetch(
         `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
@@ -164,6 +185,8 @@ export default function PreStartView() {
       setCurrent(slice[0])
       setHours(slice)
       setStatus('done')
+      // Persist results so they survive tab switches
+      localStorage.setItem('v2_prestart_result', JSON.stringify({ location: loc, hours: slice, fetchedAt: Date.now() }))
     } catch {
       setStatus('error'); setErrorMsg('Network error')
     }
@@ -172,6 +195,13 @@ export default function PreStartView() {
   const dirText  = current ? `${String(current.dir).padStart(3,'0')}°` : '—°'
   const spdText  = current ? `${mpsToKnots(current.spd).toFixed(1)}` : '—'
   const gustText = current ? `${mpsToKnots(current.gust).toFixed(1)}` : '—'
+
+  // Only show office hours (09:00–17:00); always include the current hour (NOW)
+  const officeHours = hours.filter((h, i) => {
+    if (i === 0) return true
+    const hh = parseInt(h.label)
+    return hh >= 9 && hh <= 17
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: '#000' }}>
@@ -186,7 +216,7 @@ export default function PreStartView() {
       <div style={{ flexShrink: 0, display: 'flex', gap: 8, padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <input
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={e => { setQuery(e.target.value); localStorage.setItem('v2_prestart_city', e.target.value) }}
           onKeyDown={e => e.key === 'Enter' && search()}
           placeholder="City or race area…"
           style={{
@@ -203,7 +233,7 @@ export default function PreStartView() {
 
       {/* Location label */}
       {location && (
-        <div style={{ flexShrink: 0, padding: '5px 14px' }}>
+        <div style={{ flexShrink: 0, padding: '4px 14px' }}>
           <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.06em' }}>{location.name}</span>
         </div>
       )}
@@ -226,8 +256,8 @@ export default function PreStartView() {
 
       {status === 'done' && current && (
         <>
-          {/* Current conditions — white tile */}
-          <div style={{ flexShrink: 0, height: '28%', background: '#fff', display: 'flex', alignItems: 'stretch', borderBottom: '2px solid #000' }}>
+          {/* Current conditions — white tile, capped so it doesn't dominate the screen */}
+          <div style={{ flexShrink: 0, height: 'min(110px, 20%)', background: '#fff', display: 'flex', alignItems: 'stretch', borderBottom: '2px solid #000' }}>
             <BigNum value={dirText} label="DIRECTION" sub={current ? compassLabel(current.dir) : ''} />
             <div style={{ width: 1, background: 'rgba(0,0,0,0.12)' }} />
             <BigNum value={spdText} label="WIND KTS" />
@@ -236,18 +266,18 @@ export default function PreStartView() {
           </div>
 
           {/* Direction trend chart — dark */}
-          <div style={{ flexShrink: 0, height: '22%', background: '#000', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ padding: '4px 0 0 10px', fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.3)' }}>
+          <div style={{ flexShrink: 0, height: 'min(85px, 14%)', background: '#000', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ padding: '3px 0 0 10px', fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.3)' }}>
               WIND DIRECTION — NEXT 12H
             </div>
-            <div style={{ height: 'calc(100% - 18px)' }}>
+            <div style={{ height: 'calc(100% - 16px)' }}>
               <DirChart hours={hours} />
             </div>
           </div>
 
-          {/* Hourly list */}
+          {/* Hourly list — 09:00–17:00 only */}
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-            {hours.map((h, i) => (
+            {officeHours.map((h, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'center', padding: '9px 14px',
                 borderBottom: '1px solid rgba(255,255,255,0.06)',
