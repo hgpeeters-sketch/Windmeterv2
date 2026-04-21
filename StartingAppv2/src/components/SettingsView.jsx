@@ -8,6 +8,13 @@ const ROLL_RATES = [
   { label: 'VERY SLOW', ms: 2500 },
 ]
 
+const BEEP_VOLS = [
+  { label: 'QUIET',  db: -12 },
+  { label: 'MEDIUM', db: -6  },
+  { label: 'LOUD',   db: 0   },
+  { label: 'MAX',    db: 6   },
+]
+
 function Row({ label, children }) {
   return (
     <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '16px' }}>
@@ -25,6 +32,9 @@ export default function SettingsView() {
   const [rollMs, setRollMs] = useState(
     () => parseInt(localStorage.getItem('rollRefreshMs') || '500')
   )
+  const [beepDb, setBeepDb] = useState(
+    () => parseFloat(localStorage.getItem('beepVolDb') ?? '0')
+  )
 
   function save() {
     setApiKey(key.trim())
@@ -35,6 +45,11 @@ export default function SettingsView() {
   function selectRollRate(ms) {
     setRollMs(ms)
     localStorage.setItem('rollRefreshMs', ms)
+  }
+
+  function selectBeepVol(db) {
+    setBeepDb(db)
+    localStorage.setItem('beepVolDb', db)
   }
 
   const hasKey = key.trim().length > 0
@@ -49,6 +64,29 @@ export default function SettingsView() {
           SETTINGS
         </span>
       </div>
+
+      {/* Beep volume */}
+      <Row label="BEEP VOLUME">
+        <div style={{ display: 'flex', gap: 8 }}>
+          {BEEP_VOLS.map(({ label, db }) => (
+            <button
+              key={db}
+              onClick={() => selectBeepVol(db)}
+              style={{
+                flex: 1, padding: '10px 4px',
+                background: beepDb === db ? '#fff' : 'transparent',
+                border: `1px solid rgba(255,255,255,${beepDb === db ? 1 : 0.25})`,
+                color: beepDb === db ? '#000' : 'rgba(255,255,255,0.55)',
+                fontFamily: 'monospace', fontWeight: 700, fontSize: 10,
+                letterSpacing: '0.05em', cursor: 'pointer',
+              }}
+            >{label}</button>
+          ))}
+        </div>
+        <div style={{ marginTop: 8, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>
+          {beepDb === -12 ? '−12 dB' : beepDb === -6 ? '−6 dB' : beepDb === 0 ? '0 dB (default)' : '+6 dB'} · Controls timer signal volume. Tap START to test.
+        </div>
+      </Row>
 
       {/* Roll refresh rate */}
       <Row label="ROLL REFRESH RATE">

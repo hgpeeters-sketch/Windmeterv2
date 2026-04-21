@@ -18,10 +18,14 @@ const TABS = [
 
 const TOTAL = 5 * 60
 
+const isIOS        = /iPhone|iPad|iPod/.test(navigator.userAgent)
+const isStandalone = window.navigator.standalone === true
+
 function App() {
   const { wind, samples, speedBuckets } = useWindData()
   const [tab, setTab] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showIosHint, setShowIosHint] = useState(false)
 
   // ── Timer lives here so it keeps running across tab switches ──────────
   const [remaining, setRemaining] = useState(() => {
@@ -35,17 +39,19 @@ function App() {
   // ── Audio (Web Audio API) ─────────────────────────────────────────────
   const audioCtxRef = useRef(null)
 
-  function beep(freq, dur, vol = 0.35, delay = 0) {
+  function beep(freq, dur, vol = 0.8, delay = 0) {
     const ctx = audioCtxRef.current
-    if (!ctx || ctx.state !== 'running') return  // only play when context is unlocked
+    if (!ctx || ctx.state !== 'running') return
     try {
+      const dbGain   = parseFloat(localStorage.getItem('beepVolDb') ?? '0')
+      const amplitude = Math.min(1.5, vol * Math.pow(10, dbGain / 20))
       const osc  = ctx.createOscillator()
       const gain = ctx.createGain()
       osc.connect(gain); gain.connect(ctx.destination)
       osc.frequency.value = freq
       const t = ctx.currentTime + delay
       gain.gain.setValueAtTime(0, t)
-      gain.gain.linearRampToValueAtTime(vol, t + 0.01)
+      gain.gain.linearRampToValueAtTime(amplitude, t + 0.01)
       gain.gain.exponentialRampToValueAtTime(0.001, t + dur)
       osc.start(t); osc.stop(t + dur + 0.05)
     } catch {}
@@ -68,17 +74,13 @@ function App() {
 
   function playSignal(r) {
     if (r === 0) {
-      // GO — three ascending tones
-      beep(660, 0.18, 0.4, 0); beep(880, 0.18, 0.4, 0.25); beep(1100, 0.5, 0.5, 0.5)
+      beep(660, 0.18, 0.9, 0); beep(880, 0.18, 0.9, 0.25); beep(1100, 0.5, 1.0, 0.5)
     } else if (r <= 15) {
-      // Final 15 s — quick tick every second
-      beep(880, 0.07, 0.3)
+      beep(880, 0.08, 0.75)
     } else if (r <= 60 && r % 10 === 0) {
-      // Last minute — double beep every 10 s
-      beep(660, 0.1, 0.35, 0); beep(660, 0.1, 0.35, 0.22)
+      beep(660, 0.12, 0.8, 0); beep(660, 0.12, 0.8, 0.22)
     } else if (r % 60 === 0) {
-      // Each full minute — single longer beep
-      beep(440, 0.45, 0.4)
+      beep(440, 0.5, 0.8)
     }
   }
 
@@ -104,7 +106,7 @@ function App() {
     const next = !runningRef.current
     if (next) {
       // Unlock AudioContext from this user gesture, then play a start confirmation beep
-      unlockAudio(() => beep(660, 0.12, 0.3))
+      unlockAudio(() => beep(660, 0.12, 0.8))
     }
     runningRef.current = next
     setTimerRunning(next)
@@ -129,6 +131,10 @@ function App() {
 
   // ── Fullscreen ────────────────────────────────────────────────────────
   const toggleFullscreen = useCallback(() => {
+    if (isIOS) {
+      if (!isStandalone) setShowIosHint(h => !h)
+      return
+    }
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen?.()
         .then(() => setIsFullscreen(true))
@@ -186,15 +192,40 @@ function App() {
         ))}
         <button
           onClick={toggleFullscreen}
-          title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
           style={{
             width: 36, background: '#000', border: 'none',
             borderLeft: '1px solid rgba(255,255,255,0.12)',
-            color: 'rgba(255,255,255,0.35)', fontSize: 14,
-            cursor: 'pointer', padding: 0, flexShrink: 0,
+            color: isStandalone ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.35)',
+            fontSize: isIOS ? 11 : 14,
+            cursor: isStandalone ? 'default' : 'pointer', padding: 0, flexShrink: 0,
           }}
-        >{isFullscreen ? '⊠' : '⛶'}</button>
+        >{isIOS ? (isStandalone ? '⊠' : '⛶') : (isFullscreen ? '⊠' : '⛶')}</button>
       </div>
+
+      {showIosHint && (
+        <div onClick={() => setShowIosHint(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          padding: '0 0 60px', zIndex: 999,
+        }}>
+          <div style={{
+            background: '#111', border: '1px solid rgba(255,255,255,0.15)',
+            padding: '20px 22px', maxWidth: 340, width: '100%',
+          }}>
+            <div style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>FULLSCREEN ON iOS</div>
+            <div style={{ fontSize: 13, fontFamily: 'monospace', color: '#fff', lineHeight: 1.8 }}>
+              1. Tap the <strong style={{ color: '#fff' }}>Share</strong> button (⬜↑) in Safari
+            </div>
+            <div style={{ fontSize: 13, fontFamily: 'monospace', color: '#fff', lineHeight: 1.8 }}>
+              2. Tap <strong style={{ color: '#fff' }}>"Add to Home Screen"</strong>
+            </div>
+            <div style={{ fontSize: 13, fontFamily: 'monospace', color: '#fff', lineHeight: 1.8 }}>
+              3. Open the app from your home screen
+            </div>
+            <div style={{ marginTop: 14, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>Tap anywhere to dismiss</div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
