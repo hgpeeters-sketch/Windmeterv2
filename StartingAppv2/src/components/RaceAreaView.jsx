@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 
+function haversineDistance(p1, p2) {
+  const toRad = d => d * Math.PI / 180
+  const R = 6371000
+  const dLat = toRad(p2.lat - p1.lat)
+  const dLon = toRad(p2.lon - p1.lon)
+  const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(p1.lat)) * Math.cos(toRad(p2.lat)) * Math.sin(dLon/2) ** 2
+  return Math.round(2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)))
+}
+
 function compassLabel(deg) {
   const pts = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']
   return pts[Math.round(((deg % 360) + 360) % 360 / 22.5) % 16]
@@ -245,6 +254,14 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
           onPing={() => ping('pin')}
           onReset={() => resetEnd('pin')}
         />
+        {committee && pin && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 2 }}>
+            <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', width: 68, flexShrink: 0 }}>LINE LENGTH</span>
+            <span style={{ fontSize: 13, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>
+              {haversineDistance(committee, pin)} m
+            </span>
+          </div>
+        )}
         {(gpsError || (!boatPos && !gpsError)) && (
           <span style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.22)', marginTop: 1 }}>
             {gpsError ? `GPS: ${gpsError}` : 'Acquiring GPS…'}

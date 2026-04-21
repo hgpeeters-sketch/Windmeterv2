@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 
+function haversineDistance(p1, p2) {
+  const toRad = d => d * Math.PI / 180
+  const R = 6371000
+  const dLat = toRad(p2.lat - p1.lat)
+  const dLon = toRad(p2.lon - p1.lon)
+  const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(p1.lat)) * Math.cos(toRad(p2.lat)) * Math.sin(dLon/2) ** 2
+  return Math.round(2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)))
+}
+
 function distToLine(boat, p1, p2) {
   const toRad = d => d * Math.PI / 180
   const R = 6371000
@@ -73,6 +82,7 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
   const [distFs, setDistFs] = useState(60)
   const lastNotifDist   = useRef(null)
   const lastNotifTime   = useRef(0)
+  const ocsNotifSent    = useRef(false)
 
   useEffect(() => {
     const tick = () => setTime(new Date().toTimeString().slice(0, 8))
@@ -109,8 +119,10 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
     return () => ro.disconnect()
   }, [countdownText])
 
-  const lineDist = (boatPos && committee && pin) ? distToLine(boatPos, committee, pin) : null
-  const distText = lineDist === null ? '—' : `${lineDist > 0 ? '+' : ''}${lineDist} m`
+  const lineDist  = (boatPos && committee && pin) ? distToLine(boatPos, committee, pin) : null
+  const lineLength = (committee && pin) ? haversineDistance(committee, pin) : null
+  const distText  = lineDist === null ? '—' : `${lineDist > 0 ? '+' : ''}${lineDist} m`
+  const isOCS     = lineDist !== null && lineDist > 0 && remaining <= 60 && running
 
   useEffect(() => {
     const el = distRef.current; if (!el) return
@@ -142,6 +154,21 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
       })
     } catch {}
   }, [lineDist, notifPerm])
+
+  // OCS alert: fires once when entering OCS state, rearms when cleared
+  useEffect(() => {
+    if (!isOCS) { ocsNotifSent.current = false; return }
+    if (ocsNotifSent.current || notifPerm !== 'granted') return
+    ocsNotifSent.current = true
+    try {
+      new Notification('⚠ OCS', {
+        body: `+${lineDist} m over the line — ${remaining}s to go`,
+        tag: 'ocs-alert',
+        renotify: true,
+        silent: false,
+      })
+    } catch {}
+  }, [isOCS, notifPerm])
 
   let lineBias = null, biasEnd = null
   if (pin && committee && wind) {
@@ -178,11 +205,18 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
         </div>
       </div>
 
-      {/* Distance to line — enlarged now that ping buttons are in AREA tab */}
-      <div ref={distRef} style={{ flex: 3, minHeight: 0, background: BG(2), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 14px', gap: 6 }}>
+      {/* Distance to line */}
+      <div ref={distRef} style={{
+        flex: 3, minHeight: 0,
+        background: isOCS ? '#1e0000' : BG(2),
+        display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 14px', gap: 6,
+        transition: 'background 0.3s',
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(2)},0.4)` }}>DISTANCE TO START LINE</span>
-          {notifPerm === 'default' && (
+          <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: isOCS ? 'rgba(255,80,80,0.7)' : `rgba(${RGB(2)},0.4)` }}>
+            DISTANCE TO START LINE{lineLength !== null ? `  ·  LINE ${lineLength} m` : ''}
+          </span>
+          {notifPerm === 'default' && !isOCS && (
             <button onClick={requestNotifPermission} style={{
               padding: '3px 8px', background: 'transparent',
               border: `1px solid rgba(${RGB(2)},0.25)`,
@@ -191,21 +225,24 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
               letterSpacing: '0.08em', cursor: 'pointer',
             }}>WATCH ⌚</button>
           )}
-          {notifPerm === 'granted' && (
+          {notifPerm === 'granted' && !isOCS && (
             <span style={{ fontSize: 9, fontFamily: 'monospace', color: `rgba(${RGB(2)},0.35)`, letterSpacing: '0.08em' }}>⌚ WATCH ON</span>
+          )}
+          {isOCS && (
+            <span style={{ fontSize: 13, fontFamily: 'monospace', fontWeight: 700, color: '#ff4444', letterSpacing: '0.2em' }}>⚠ OCS</span>
           )}
         </div>
         <span style={{
           fontSize: distFs, fontWeight: 900, fontFamily: 'monospace', lineHeight: 1,
-          color: lineDist === null
-            ? `rgba(${RGB(2)},0.2)`
+          color: isOCS ? '#ff3333'
+            : lineDist === null ? `rgba(${RGB(2)},0.2)`
             : lineDist > 0 ? FG(2) : `rgba(${RGB(2)},0.65)`,
           letterSpacing: '-0.02em',
         }}>
           {distText}
         </span>
         {lineDist !== null && (
-          <span style={{ fontSize: 11, fontFamily: 'monospace', color: `rgba(${RGB(2)},0.5)` }}>
+          <span style={{ fontSize: 11, fontFamily: 'monospace', color: isOCS ? 'rgba(255,80,80,0.7)' : `rgba(${RGB(2)},0.5)` }}>
             {lineDist > 0 ? 'OVER LINE' : 'BEHIND LINE'}
           </span>
         )}

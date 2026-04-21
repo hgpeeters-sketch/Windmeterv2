@@ -15,7 +15,7 @@ const TABS = [
   { label: '⚙',          short: '⚙',  gear: true },
 ]
 
-const TOTAL      = 5 * 60
+const getTotal = () => parseInt(localStorage.getItem('timerMinutes') || '5') * 60
 const isIOS        = /iPhone|iPad|iPod/.test(navigator.userAgent)
 const isStandalone = window.navigator.standalone === true
 
@@ -56,7 +56,7 @@ function App() {
   // ── Timer lives here so it keeps running across tab switches ──────────
   const [remaining, setRemaining] = useState(() => {
     const v = localStorage.getItem('sl_remaining')
-    return v !== null ? Math.max(0, parseInt(v)) : TOTAL
+    return v !== null ? Math.max(0, parseInt(v)) : getTotal()
   })
   const [timerRunning, setTimerRunning] = useState(false)
   const runningRef   = useRef(false)
@@ -137,10 +137,11 @@ function App() {
   }
 
   function handleTimerReset() {
+    const total = getTotal()
     runningRef.current = false
-    remainingRef.current = TOTAL
+    remainingRef.current = total
     setTimerRunning(false)
-    setRemaining(TOTAL)
+    setRemaining(total)
     localStorage.removeItem('sl_remaining')
   }
 
