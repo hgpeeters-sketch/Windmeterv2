@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "WindMeter",
+    "slug": "windmeter-v3",
+    "version": "3.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#07090f",
+    "splash": {
+      "backgroundColor": "#07090f"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.windmeter.v3",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "WindMeter uses GPS to record your track during races.",
+        "NSMotionUsageDescription": "WindMeter uses motion sensors to detect heel and roll."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#07090f"
+      },
+      "package": "com.windmeter.v3",
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-location",
+      "expo-notifications",
+      "expo-av",
+      "expo-keep-awake"
+    ]
+  }
+}
