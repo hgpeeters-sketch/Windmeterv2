@@ -6,15 +6,15 @@ import StartSequenceView from './components/StartSequenceView'
 import DashboardView from './components/DashboardView'
 import TrackView from './components/TrackView'
 import SettingsView from './components/SettingsView'
+import { C, F } from './theme'
 
 const TABS = [
-  { label: 'PRE-START',  short: 'PRE'    },
-  { label: 'RACE AREA',  short: 'AREA'   },
-  { label: 'COURSE',     short: 'COURSE' },
-  { label: 'START',      short: 'START'  },
-  { label: 'RACING',     short: 'RACE'   },
-  { label: 'TRACK',      short: 'TRACK'  },
-  { label: '⚙',          short: '⚙',  gear: true },
+  { label: 'PRE',    short: 'PRE'   },
+  { label: 'AREA',   short: 'AREA'  },
+  { label: '+',      short: '+', isPlus: true },
+  { label: 'START',  short: 'START' },
+  { label: 'RACE',   short: 'RACE'  },
+  { label: 'TRACK',  short: 'TRACK' },
 ]
 
 const getTotal = () => parseInt(localStorage.getItem('timerMinutes') || '5') * 60
@@ -38,10 +38,23 @@ function loadTwd() {
 
 function App() {
   const [tab, setTab] = useState(0)
+  const [showSettings, setShowSettings] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showIosHint, setShowIosHint] = useState(false)
   const [manualTwd, setManualTwd] = useState(loadTwd)
   const [manualSamples, setManualSamples] = useState(loadSamples)
+  const [clock, setClock] = useState('')
+
+  useEffect(() => {
+    const tick = () => {
+      const d = new Date()
+      const h = String(d.getHours()).padStart(2, '0')
+      const m = String(d.getMinutes()).padStart(2, '0')
+      const s = String(d.getSeconds()).padStart(2, '0')
+      setClock(`${h}:${m}:${s}`)
+    }
+    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
+  }, [])
 
   function logWindDir(dir) {
     const now = Date.now()
@@ -55,7 +68,7 @@ function App() {
     })
   }
 
-  // ── Timer lives here so it keeps running across tab switches ──────────
+  // ── Timer ──────────────────────────────────────────────────────────────
   const [remaining, setRemaining] = useState(() => {
     const v = localStorage.getItem('sl_remaining')
     return v !== null ? Math.max(0, parseInt(v)) : getTotal()
@@ -64,7 +77,6 @@ function App() {
   const runningRef   = useRef(false)
   const remainingRef = useRef(remaining)
 
-  // ── Audio (Web Audio API) ─────────────────────────────────────────────
   const audioCtxRef = useRef(null)
 
   function beep(freq, dur, vol = 0.8, delay = 0) {
@@ -122,7 +134,7 @@ function App() {
       if (r <= 0) {
         runningRef.current = false
         setTimerRunning(false)
-        setTimeout(() => setTab(5), 800) // switch to TRACK tab at gun
+        setTimeout(() => { setShowSettings(false); setTab(5) }, 800)
       }
     }, 1000)
     return () => clearInterval(id)
@@ -131,9 +143,7 @@ function App() {
   function handleTimerStartStop() {
     if (remainingRef.current <= 0) return
     const next = !runningRef.current
-    if (next) {
-      unlockAudio(() => beep(660, 0.12, 0.8))
-    }
+    if (next) unlockAudio(() => beep(660, 0.12, 0.8))
     runningRef.current = next
     setTimerRunning(next)
   }
@@ -156,7 +166,7 @@ function App() {
     localStorage.setItem('sl_remaining', next)
   }
 
-  // ── Screen Wake Lock — keeps display on while app is active ─────────
+  // ── Wake Lock ──────────────────────────────────────────────────────────
   const wakeLockRef = useRef(null)
   const [wakeLockOn, setWakeLockOn] = useState(false)
 
@@ -176,7 +186,7 @@ function App() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
-  // ── Fullscreen ────────────────────────────────────────────────────────
+  // ── Fullscreen ─────────────────────────────────────────────────────────
   const toggleFullscreen = useCallback(() => {
     if (isIOS) {
       if (!isStandalone) setShowIosHint(h => !h)
@@ -194,64 +204,118 @@ function App() {
   }, [])
 
   const wind = { direction: manualTwd ?? 0 }
+  const tabLabel = showSettings ? 'SETTINGS' : (TABS[tab]?.label ?? '')
 
   return (
     <div style={{
-      background: '#000',
+      background: C.bg,
       width: '100%', height: '100%',
       display: 'flex', flexDirection: 'column',
-      fontFamily: 'monospace',
+      fontFamily: F.bc,
       maxWidth: 430,
       margin: '0 auto',
     }}>
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {tab === 0 && <PreStartView />}
-        {tab === 1 && <RaceAreaView manualTwd={manualTwd} logWindDir={logWindDir} samples={manualSamples} />}
-        {tab === 2 && <CourseAnalysisView wind={wind} samples={manualSamples} />}
-        {tab === 3 && (
-          <StartSequenceView
-            wind={wind}
-            remaining={remaining}
-            running={timerRunning}
-            onStartStop={handleTimerStartStop}
-            onReset={handleTimerReset}
-            onSync={handleTimerSync}
-          />
-        )}
-        {tab === 4 && <DashboardView wind={wind} />}
-        {tab === 5 && <TrackView remaining={remaining} twd={manualTwd} samples={manualSamples} />}
-        {tab === 6 && <SettingsView />}
+      {/* Header bar */}
+      <div style={{
+        height: 34, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        paddingLeft: 14, paddingRight: 10,
+        borderBottom: `1px solid ${C.sep}`,
+        background: C.bg,
+      }}>
+        <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, letterSpacing: '0.25em', color: C.cyan, textTransform: 'uppercase' }}>
+          {tabLabel}
+        </span>
+        <span style={{ fontFamily: F.bc, fontWeight: 600, fontSize: 12, color: C.textDim, letterSpacing: '0.08em' }}>
+          {clock}
+        </span>
       </div>
 
-      <div style={{ height: 1, background: 'rgba(255,255,255,0.12)' }} />
-      <div style={{ display: 'flex', height: 44, flexShrink: 0 }}>
-        {TABS.map(({ label, short, gear }, i) => (
-          <button
-            key={i}
-            onClick={() => setTab(i)}
-            style={{
-              flex: gear ? 0.5 : 1, background: '#000', border: 'none',
-              borderRight: i < TABS.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none',
-              color: tab === i ? '#fff' : 'rgba(255,255,255,0.28)',
-              fontFamily: 'monospace', fontWeight: 700,
-              fontSize: gear ? 16 : 8,
-              letterSpacing: gear ? 0 : '0.08em',
-              cursor: 'pointer', padding: 0,
-            }}
-          >{short}</button>
-        ))}
-        <div style={{ display: 'flex', alignItems: 'center', borderLeft: '1px solid rgba(255,255,255,0.12)', flexShrink: 0 }}>
-          <span title={wakeLockOn ? 'Screen will stay on' : 'Screen lock inactive'} style={{
-            width: 18, textAlign: 'center',
-            fontSize: 7, color: wakeLockOn ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.15)',
+      {/* Content */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {showSettings ? (
+          <SettingsView />
+        ) : (
+          <>
+            {tab === 0 && <PreStartView />}
+            {tab === 1 && <RaceAreaView manualTwd={manualTwd} logWindDir={logWindDir} samples={manualSamples} />}
+            {tab === 2 && <CourseAnalysisView wind={wind} samples={manualSamples} />}
+            {tab === 3 && (
+              <StartSequenceView
+                wind={wind}
+                remaining={remaining}
+                running={timerRunning}
+                onStartStop={handleTimerStartStop}
+                onReset={handleTimerReset}
+                onSync={handleTimerSync}
+              />
+            )}
+            {tab === 4 && <DashboardView wind={wind} />}
+            {tab === 5 && <TrackView remaining={remaining} twd={manualTwd} samples={manualSamples} />}
+          </>
+        )}
+      </div>
+
+      {/* Separator */}
+      <div style={{ height: 1, background: C.sep, flexShrink: 0 }} />
+
+      {/* Tab bar */}
+      <div style={{ display: 'flex', height: 46, flexShrink: 0, background: C.bg }}>
+        {TABS.map(({ short, isPlus }, i) => {
+          const active = !showSettings && tab === i
+          return (
+            <button
+              key={i}
+              onClick={() => { setShowSettings(false); setTab(i) }}
+              style={{
+                flex: isPlus ? 0.65 : 1,
+                background: C.bg,
+                border: 'none',
+                borderTop: `2px solid ${active ? C.cyan : 'transparent'}`,
+                borderRight: i < TABS.length - 1 ? `1px solid ${C.sep}` : 'none',
+                color: active ? C.cyan : C.textDim,
+                fontFamily: F.bc,
+                fontWeight: 700,
+                fontSize: isPlus ? 20 : 9,
+                letterSpacing: isPlus ? 0 : '0.12em',
+                cursor: 'pointer',
+                padding: 0,
+                lineHeight: isPlus ? '46px' : undefined,
+              }}
+            >{short}</button>
+          )
+        })}
+
+        {/* Wake lock dot + gear + fullscreen */}
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          borderLeft: `1px solid ${C.sep}`,
+          borderTop: `2px solid ${showSettings ? C.cyan : 'transparent'}`,
+          flexShrink: 0,
+        }}>
+          <span title={wakeLockOn ? 'Screen on' : 'Screen lock inactive'} style={{
+            width: 16, textAlign: 'center', fontSize: 6,
+            color: wakeLockOn ? C.cyan : C.sep,
           }}>●</span>
+          <button
+            onClick={() => setShowSettings(s => !s)}
+            style={{
+              width: 28, height: '100%',
+              background: C.bg, border: 'none',
+              color: showSettings ? C.cyan : C.textDim,
+              fontSize: 15, cursor: 'pointer', padding: 0,
+              fontFamily: 'monospace',
+            }}
+          >⚙</button>
           <button
             onClick={toggleFullscreen}
             style={{
-              width: 30, height: '100%', background: '#000', border: 'none',
-              color: isStandalone ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.35)',
-              fontSize: isIOS ? 11 : 14,
-              cursor: isStandalone ? 'default' : 'pointer', padding: 0,
+              width: 26, height: '100%',
+              background: C.bg, border: 'none',
+              color: isStandalone ? C.sep : C.textDim,
+              fontSize: isIOS ? 11 : 13,
+              cursor: isStandalone ? 'default' : 'pointer',
+              padding: 0, fontFamily: 'monospace',
             }}
           >{isIOS ? (isStandalone ? '⊠' : '⛶') : (isFullscreen ? '⊠' : '⛶')}</button>
         </div>
@@ -264,27 +328,27 @@ function App() {
           padding: '0 0 60px', zIndex: 999,
         }}>
           <div style={{
-            background: '#111', border: '1px solid rgba(255,255,255,0.15)',
+            background: C.card, border: `1px solid ${C.sep}`,
             padding: '20px 22px', maxWidth: 340, width: '100%',
           }}>
-            <div style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>FULLSCREEN ON iOS</div>
-            <div style={{ fontSize: 13, fontFamily: 'monospace', color: '#fff', lineHeight: 1.8 }}>
-              1. Tap the <strong style={{ color: '#fff' }}>Share</strong> button (⬜↑) in Safari
+            <div style={{ fontSize: 11, fontFamily: F.bc, letterSpacing: '0.2em', color: C.textDim, marginBottom: 12 }}>FULLSCREEN ON iOS</div>
+            <div style={{ fontSize: 13, fontFamily: F.b, color: C.text, lineHeight: 1.8 }}>
+              1. Tap the <strong style={{ color: C.cyan }}>Share</strong> button (⬜↑) in Safari
             </div>
-            <div style={{ fontSize: 13, fontFamily: 'monospace', color: '#fff', lineHeight: 1.8 }}>
-              2. Tap <strong style={{ color: '#fff' }}>"Add to Home Screen"</strong>
+            <div style={{ fontSize: 13, fontFamily: F.b, color: C.text, lineHeight: 1.8 }}>
+              2. Tap <strong style={{ color: C.cyan }}>"Add to Home Screen"</strong>
             </div>
-            <div style={{ fontSize: 13, fontFamily: 'monospace', color: '#fff', lineHeight: 1.8 }}>
+            <div style={{ fontSize: 13, fontFamily: F.b, color: C.text, lineHeight: 1.8 }}>
               3. Open the app from your home screen
             </div>
-            <div style={{ marginTop: 14, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>Tap anywhere to dismiss</div>
+            <div style={{ marginTop: 14, fontSize: 10, fontFamily: F.bc, color: C.textDim }}>Tap anywhere to dismiss</div>
           </div>
         </div>
       )}
 
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body, #root { height: 100%; overflow: hidden; background: #000; }
+        html, body, #root { height: 100%; overflow: hidden; background: ${C.bg}; }
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>

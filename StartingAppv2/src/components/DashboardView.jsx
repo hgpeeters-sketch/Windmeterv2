@@ -1,20 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
+import { C, F, NUM_SHADOW } from '../theme'
 
-const BG  = i => i % 2 === 0 ? '#000' : '#fff'
-const FG  = i => i % 2 === 0 ? '#fff' : '#000'
-const RGB = i => i % 2 === 0 ? '255,255,255' : '0,0,0'
-
-function fitFontSize(text, W, H, weight = '900') {
-  const canvas = document.createElement('canvas')
-  const ctx = canvas.getContext('2d')
-  let fs = Math.floor(H * 0.88)
-  while (fs > 20) {
-    ctx.font = `${weight} ${fs}px monospace`
-    if (ctx.measureText(text).width <= W - 8) break
-    fs -= 2
-  }
-  return fs
-}
+const SL = ({ label, right }) => (
+  <div style={{
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '7px 14px', borderBottom: `1px solid ${C.sep}`, flexShrink: 0,
+  }}>
+    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
+    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, color: C.textDim }}>{right}</span>}
+  </div>
+)
 
 function CogChart({ history }) {
   const containerRef = useRef(null)
@@ -42,11 +37,10 @@ function CogChart({ history }) {
       const mean = values.reduce((a, b) => a + b, 0) / values.length
       const meanY = toY(mean)
       ctx.setLineDash([3, 3])
-      ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1
+      ctx.strokeStyle = C.sep; ctx.lineWidth = 1
       ctx.beginPath(); ctx.moveTo(0, meanY); ctx.lineTo(W, meanY); ctx.stroke()
       ctx.setLineDash([])
-
-      ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '8px monospace'; ctx.textAlign = 'right'
+      ctx.fillStyle = C.textDim; ctx.font = '700 8px "Barlow Condensed", monospace'; ctx.textAlign = 'right'
       ctx.fillText(`${mean.toFixed(0)}°`, W - 2, meanY - 3)
 
       ctx.beginPath()
@@ -55,134 +49,27 @@ function CogChart({ history }) {
         const y = toY(pt.cog)
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
       })
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2
+      ctx.strokeStyle = 'rgba(0,221,192,0.7)'; ctx.lineWidth = 2
       ctx.lineJoin = 'round'; ctx.stroke()
 
       const last = history[history.length - 1]
       ctx.beginPath()
       ctx.arc(W, toY(last.cog), 4, 0, Math.PI * 2)
-      ctx.fillStyle = '#fff'; ctx.fill()
+      ctx.fillStyle = C.cyan; ctx.fill()
 
-      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '8px monospace'
+      ctx.fillStyle = C.textDim; ctx.font = '700 8px "Barlow Condensed", monospace'
       ctx.textAlign = 'left';  ctx.fillText('oldest', 2, H - 2)
       ctx.textAlign = 'right'; ctx.fillText('now', W - 2, H - 2)
     }
 
     const ro = new ResizeObserver(draw)
-    ro.observe(container)
-    draw()
+    ro.observe(container); draw()
     return () => ro.disconnect()
   }, [history])
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0 }} />
-    </div>
-  )
-}
-
-function CogTile({ cog, history, gpsError }) {
-  const containerRef = useRef(null)
-  const [fontSize, setFontSize] = useState(80)
-  const text = cog !== null ? `${Math.round(cog)}°` : '—°'
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const compute = () => {
-      const { clientWidth: W, clientHeight: H } = el
-      if (W && H) setFontSize(fitFontSize(text, W, H * 0.52))
-    }
-    const ro = new ResizeObserver(compute)
-    ro.observe(el); compute()
-    return () => ro.disconnect()
-  }, [text])
-
-  let trend = null
-  if (history.length >= 6) {
-    const n = history.length
-    const third = Math.floor(n / 3)
-    const firstAvg = history.slice(0, third).reduce((a, b) => a + b.cog, 0) / third
-    const lastAvg  = history.slice(-third).reduce((a, b) => a + b.cog, 0) / third
-    trend = lastAvg - firstAvg
-  }
-
-  return (
-    <div ref={containerRef} style={{ flex: 3, minHeight: 0, background: BG(1), position: 'relative', display: 'flex', flexDirection: 'column' }}>
-      <span style={{ position: 'absolute', top: 6, left: 10, fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(1)},0.4)`, zIndex: 1 }}>COG</span>
-      {trend !== null && (
-        <span style={{ position: 'absolute', top: 6, right: 10, fontSize: 11, fontFamily: 'monospace', color: `rgba(${RGB(1)},0.5)`, zIndex: 1 }}>
-          {trend > 0.5 ? `▲ +${trend.toFixed(1)}°` : trend < -0.5 ? `▼ ${trend.toFixed(1)}°` : '— STEADY'}
-        </span>
-      )}
-      <div style={{ height: '52%', display: 'flex', alignItems: 'center', paddingLeft: 6 }}>
-        <span style={{ fontSize, fontWeight: 900, fontFamily: 'monospace', color: FG(1), lineHeight: 1, letterSpacing: '-0.02em' }}>
-          {text}
-        </span>
-      </div>
-      <div style={{ height: '48%', borderTop: `1px solid rgba(${RGB(1)},0.12)`, background: BG(0), position: 'relative' }}>
-        {history.length >= 2
-          ? <CogChart history={history} />
-          : <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.2)', letterSpacing: '0.1em' }}>
-              {gpsError || 'COLLECTING COG DATA…'}
-            </span>
-        }
-      </div>
-    </div>
-  )
-}
-
-// Roll tile: shows leeward-corrected value when tack is known, otherwise raw roll.
-// leewardRoll convention: negative = leeward (heel to leeward side), positive = windward
-function RollTile({ roll, leewardRoll, onTap }) {
-  const containerRef = useRef(null)
-  const [fontSize, setFontSize] = useState(80)
-
-  const hasTack   = leewardRoll !== null
-  const displayVal = hasTack ? leewardRoll : roll
-  const text = displayVal !== null
-    ? `${displayVal >= 0 ? '+' : ''}${Number(displayVal).toFixed(1)}°`
-    : '—°'
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const compute = () => {
-      const { clientWidth: W, clientHeight: H } = el
-      if (W && H) setFontSize(fitFontSize(text, W, H))
-    }
-    const ro = new ResizeObserver(compute)
-    ro.observe(el); compute()
-    return () => ro.disconnect()
-  }, [text])
-
-  let side = null
-  if (hasTack && displayVal !== null) {
-    side = Math.abs(leewardRoll) <= 1 ? 'LEVEL' : leewardRoll < -1 ? 'LEEWARD' : 'WINDWARD'
-  } else if (!hasTack && roll !== null) {
-    side = roll > 1 ? 'PORT' : roll < -1 ? 'STBD' : 'LEVEL'
-  }
-
-  return (
-    <div ref={containerRef} onClick={onTap} style={{ flex: 3, minHeight: 0, background: BG(2), position: 'relative', overflow: 'hidden', cursor: roll === null ? 'pointer' : 'default' }}>
-      <span style={{ position: 'absolute', top: 6, left: 10, fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(2)},0.4)`, zIndex: 1 }}>ROLL</span>
-      {roll === null && (
-        <span style={{ position: 'absolute', top: 6, right: 10, fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.12em', color: `rgba(${RGB(2)},0.3)`, zIndex: 1 }}>TAP TO ACTIVATE</span>
-      )}
-      <div style={{ height: '100%', display: 'flex', alignItems: 'center', paddingLeft: 6 }}>
-        <span style={{ fontSize, fontWeight: 900, fontFamily: 'monospace', color: roll === null ? `rgba(${RGB(2)},0.2)` : FG(2), lineHeight: 1, letterSpacing: '-0.02em' }}>
-          {text}
-        </span>
-      </div>
-      {side && (
-        <span style={{
-          position: 'absolute', bottom: 8, right: 10,
-          fontSize: 'clamp(14px,3vh,26px)', fontFamily: 'monospace', fontWeight: 700,
-          color: side === 'LEVEL' ? `rgba(${RGB(2)},0.6)` : `rgba(${RGB(2)},0.45)`,
-        }}>
-          {side}
-        </span>
-      )}
     </div>
   )
 }
@@ -199,8 +86,8 @@ export default function DashboardView({ wind }) {
   const [cog, setCog]               = useState(null)
   const [cogHistory, setCogHistory] = useState([])
   const [roll, setRoll]             = useState(null)
-  const [time, setTime]             = useState('')
   const [gpsError, setGpsError]     = useState(null)
+  const [rollActive, setRollActive] = useState(false)
   const lastSample                  = useRef(0)
   const rollSmoothed                = useRef(null)
   const rollLastUpdate              = useRef(0)
@@ -219,17 +106,13 @@ export default function DashboardView({ wind }) {
   }
 
   function listenMotion() {
+    setRollActive(true)
     window.addEventListener('devicemotion', e => {
       const acc = e.accelerationIncludingGravity
       if (!acc || acc.x === null) return
       applyRoll(computeHeel(acc.x, acc.y, acc.z))
     })
   }
-
-  useEffect(() => {
-    const tick = () => setTime(new Date().toTimeString().slice(0, 8))
-    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
-  }, [])
 
   useEffect(() => {
     if (!navigator.geolocation) { setGpsError('GPS not available'); return }
@@ -252,15 +135,11 @@ export default function DashboardView({ wind }) {
     if (typeof DeviceMotionEvent === 'undefined') return
     if (typeof DeviceMotionEvent.requestPermission !== 'function') {
       listenMotion()
-    } else {
-      DeviceMotionEvent.requestPermission()
-        .then(s => { if (s === 'granted') listenMotion() })
-        .catch(() => {})
     }
   }, [])
 
   async function handleRollTap() {
-    if (roll !== null) return
+    if (rollActive) return
     if (typeof DeviceMotionEvent?.requestPermission === 'function') {
       try {
         const s = await DeviceMotionEvent.requestPermission()
@@ -269,9 +148,6 @@ export default function DashboardView({ wind }) {
     }
   }
 
-  // Compute tack-aware leeward roll.
-  // On starboard tack (twa < 180): heel to port is leeward → leewardRoll = -roll (so negative = leeward)
-  // On port tack (twa >= 180): heel to starboard is leeward → leewardRoll = roll (negative = starboard = leeward)
   let leewardRoll = null
   const twd = wind?.direction ?? null
   if (roll !== null && twd !== null && cog !== null) {
@@ -280,18 +156,91 @@ export default function DashboardView({ wind }) {
     leewardRoll = parseFloat(leewardRoll.toFixed(1))
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+  const hasTack   = leewardRoll !== null
+  const displayRoll = hasTack ? leewardRoll : roll
+  const rollText  = displayRoll !== null
+    ? `${displayRoll >= 0 ? '+' : ''}${Number(displayRoll).toFixed(1)}`
+    : '—'
 
-      <div style={{ flex: 1, minHeight: 0, background: BG(0), display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)' }}>RACING</span>
-        <span style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>{time}</span>
+  let rollSide = null
+  if (hasTack && displayRoll !== null) {
+    rollSide = Math.abs(leewardRoll) <= 1 ? 'LEVEL' : leewardRoll < -1 ? 'LEEWARD' : 'WINDWARD'
+  } else if (!hasTack && roll !== null) {
+    rollSide = Math.abs(roll) <= 1 ? 'LEVEL' : roll > 1 ? 'PORT' : 'STBD'
+  }
+
+  let trend = null
+  if (cogHistory.length >= 6) {
+    const n = cogHistory.length
+    const third = Math.floor(n / 3)
+    const firstAvg = cogHistory.slice(0, third).reduce((a, b) => a + b.cog, 0) / third
+    const lastAvg  = cogHistory.slice(-third).reduce((a, b) => a + b.cog, 0) / third
+    trend = lastAvg - firstAvg
+  }
+
+  const rollIsLevel = rollSide === 'LEVEL'
+  const rollColor = roll === null ? C.textDim : rollIsLevel ? C.cyan : C.text
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', background: C.bg }}>
+
+      {/* COG section */}
+      <SL
+        label="COURSE OVER GROUND"
+        right={trend !== null ? (trend > 0.5 ? `▲ +${trend.toFixed(1)}°` : trend < -0.5 ? `▼ ${trend.toFixed(1)}°` : '— STEADY') : undefined}
+      />
+      <div style={{ background: C.card, padding: '14px 14px 6px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <span style={{ fontSize: 88, fontFamily: F.bc, fontWeight: 800, color: cog !== null ? C.text : C.textDim, lineHeight: 0.9, letterSpacing: '-0.02em', textShadow: NUM_SHADOW }}>
+            {cog !== null ? Math.round(cog) : '—'}
+          </span>
+          {cog !== null && <span style={{ fontSize: 24, fontFamily: F.bc, fontWeight: 700, color: C.cyan, marginBottom: 8, marginLeft: 4 }}>°</span>}
+        </div>
+        {gpsError && (
+          <div style={{ marginTop: 4, fontSize: 10, fontFamily: F.bc, fontWeight: 600, color: C.neg }}>{gpsError}</div>
+        )}
+      </div>
+      <div style={{ height: 70, background: C.cardAlt, flexShrink: 0 }}>
+        {cogHistory.length >= 2
+          ? <CogChart history={cogHistory} />
+          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 10, fontFamily: F.bc, fontWeight: 600, color: C.textDim, letterSpacing: '0.1em' }}>
+                {gpsError || 'COLLECTING COG DATA…'}
+              </span>
+            </div>
+        }
       </div>
 
-      <CogTile cog={cog} history={cogHistory} gpsError={gpsError} />
+      {/* Roll section */}
+      <SL label="HEEL / ROLL" right={rollSide ?? undefined} />
+      <div
+        onClick={handleRollTap}
+        style={{
+          background: C.card, padding: '14px 14px 18px', flexShrink: 0,
+          cursor: rollActive ? 'default' : 'pointer',
+        }}
+      >
+        {!rollActive && roll === null && (
+          <div style={{ marginBottom: 8, fontSize: 10, fontFamily: F.bc, fontWeight: 600, color: C.textDim, letterSpacing: '0.12em' }}>
+            TAP TO ACTIVATE
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <span style={{ fontSize: 88, fontFamily: F.bc, fontWeight: 800, color: rollColor, lineHeight: 0.9, letterSpacing: '-0.02em', textShadow: NUM_SHADOW }}>
+            {rollSide === 'LEVEL' ? '0.0' : rollText}
+          </span>
+          {displayRoll !== null && (
+            <span style={{ fontSize: 24, fontFamily: F.bc, fontWeight: 700, color: rollIsLevel ? C.cyan : C.textSub, marginBottom: 8, marginLeft: 4 }}>°</span>
+          )}
+        </div>
+        {rollSide && (
+          <div style={{ marginTop: 6, fontSize: 14, fontFamily: F.bc, fontWeight: 700, color: rollIsLevel ? C.cyan : C.textSub, letterSpacing: '0.1em' }}>
+            {rollSide}
+          </div>
+        )}
+      </div>
 
-      <RollTile roll={roll} leewardRoll={leewardRoll} onTap={handleRollTap} />
-
+      <div style={{ height: 16 }} />
     </div>
   )
 }

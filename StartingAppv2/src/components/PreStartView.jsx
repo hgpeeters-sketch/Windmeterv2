@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { C, F, NUM_SHADOW } from '../theme'
 
 function compassLabel(deg) {
   const pts = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']
@@ -7,19 +8,17 @@ function compassLabel(deg) {
 
 function mpsToKnots(mps) { return mps * 1.94384 }
 
-function fitFontSize(text, W, H, weight = '900') {
-  const canvas = document.createElement('canvas')
-  const ctx = canvas.getContext('2d')
-  let fs = Math.floor(H * 0.88)
-  while (fs > 12) {
-    ctx.font = `${weight} ${fs}px monospace`
-    if (ctx.measureText(text).width <= W - 8) break
-    fs -= 2
-  }
-  return fs
-}
+const SL = ({ label, right }) => (
+  <div style={{
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '7px 14px', borderBottom: `1px solid ${C.sep}`,
+  }}>
+    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
+    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.18em', color: C.textDim }}>{right}</span>}
+  </div>
+)
 
-function DirChart({ hours }) {
+function ShiftChart({ hours }) {
   const containerRef = useRef(null)
   const canvasRef = useRef(null)
 
@@ -36,82 +35,42 @@ function DirChart({ hours }) {
       const ctx = canvas.getContext('2d')
       ctx.clearRect(0, 0, W * 2, H * 2); ctx.scale(2, 2)
 
-      const dirs = [hours[0].dir]
-      for (let i = 1; i < hours.length; i++) {
-        let d = hours[i].dir - dirs[i - 1]
-        while (d >  180) d -= 360
-        while (d < -180) d += 360
-        dirs.push(dirs[i - 1] + d)
-      }
-
-      const minV = Math.min(...dirs) - 5
-      const maxV = Math.max(...dirs) + 5
-      const range = maxV - minV || 1
-      const toY = v => H - ((v - minV) / range) * (H - 16) - 8
-
-      for (let base = -360; base <= 720; base += 90) {
-        if (base < minV - 45 || base > maxV + 45) continue
-        const y = toY(base)
-        if (y < 0 || y > H) continue
-        const cardinal = { 0: 'N', 90: 'E', 180: 'S', 270: 'W', 360: 'N', 450: 'E', 540: 'S', 630: 'W' }
-        const lbl = cardinal[((base % 360) + 360) % 360] || ''
-        ctx.setLineDash([2, 4])
-        ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W - 20, y); ctx.stroke()
-        ctx.setLineDash([])
-        ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = '9px monospace'; ctx.textAlign = 'right'
-        ctx.fillText(lbl, W - 2, y + 3)
-      }
-
-      ctx.beginPath()
-      dirs.forEach((v, i) => {
-        const x = (i / (dirs.length - 1)) * (W - 22)
-        const y = toY(v)
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+      const dirs = hours.map(h => h.dir)
+      const mean = dirs.reduce((a, b) => a + b, 0) / dirs.length
+      const shifts = dirs.map(d => {
+        let diff = d - mean
+        if (diff > 180) diff -= 360
+        if (diff < -180) diff += 360
+        return diff
       })
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2
-      ctx.lineJoin = 'round'; ctx.stroke()
 
-      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '8px monospace'
-      const step = Math.ceil(hours.length / 4)
-      hours.forEach((h, i) => {
-        if (i % step !== 0 && i !== hours.length - 1) return
-        const x = (i / (dirs.length - 1)) * (W - 22)
-        ctx.textAlign = i === 0 ? 'left' : i === hours.length - 1 ? 'right' : 'center'
-        ctx.fillText(h.label, x, H - 1)
+      const maxAbs = Math.max(10, ...shifts.map(Math.abs))
+      const midY = H / 2
+      const barW = Math.max(3, (W - 2) / dirs.length)
+
+      // Midline
+      ctx.strokeStyle = '#18263a'; ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(W, midY); ctx.stroke()
+
+      shifts.forEach((v, i) => {
+        const barH = Math.max(2, Math.abs(v) / maxAbs * (midY - 4))
+        const x = i * barW
+        const y = v >= 0 ? midY - barH : midY
+        ctx.fillStyle = v >= 0 ? '#00ddc0' : '#f5a623'
+        ctx.globalAlpha = 0.85
+        ctx.fillRect(x, y, barW - 1, barH)
+        ctx.globalAlpha = 1
       })
     }
 
     const ro = new ResizeObserver(draw)
-    ro.observe(container)
-    draw()
+    ro.observe(container); draw()
     return () => ro.disconnect()
   }, [hours])
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', background: C.cardAlt }}>
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0 }} />
-    </div>
-  )
-}
-
-function BigNum({ value, label, sub }) {
-  const containerRef = useRef(null)
-  const [fs, setFs] = useState(60)
-  useEffect(() => {
-    const el = containerRef.current; if (!el) return
-    const compute = () => {
-      const { clientWidth: W, clientHeight: H } = el
-      if (W && H) setFs(fitFontSize(value, W - 12, H * 0.58))
-    }
-    const ro = new ResizeObserver(compute); ro.observe(el); compute()
-    return () => ro.disconnect()
-  }, [value])
-  return (
-    <div ref={containerRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2 }}>
-      <div style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.18em', color: 'rgba(0,0,0,0.4)', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: fs, fontWeight: 900, fontFamily: 'monospace', color: '#000', lineHeight: 1, letterSpacing: '-0.02em' }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(0,0,0,0.45)', marginTop: 2 }}>{sub}</div>}
     </div>
   )
 }
@@ -121,7 +80,6 @@ function loadCached() {
     const raw = localStorage.getItem('v2_prestart_result')
     if (!raw) return null
     const data = JSON.parse(raw)
-    // Keep results for up to 3 hours
     if (Date.now() - data.fetchedAt > 3 * 60 * 60 * 1000) return null
     return data
   } catch { return null }
@@ -134,9 +92,7 @@ export default function PreStartView() {
   const [location, setLocation] = useState(null)
   const [current, setCurrent]   = useState(null)
   const [hours, setHours]       = useState([])
-  const [time, setTime]         = useState('')
 
-  // Restore cached results on mount (survives tab switches)
   useEffect(() => {
     const cached = loadCached()
     if (!cached) return
@@ -144,11 +100,6 @@ export default function PreStartView() {
     setCurrent(cached.hours[0] ?? null)
     setHours(cached.hours)
     setStatus('done')
-  }, [])
-
-  useEffect(() => {
-    const tick = () => setTime(new Date().toTimeString().slice(0, 8))
-    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
   }, [])
 
   async function search() {
@@ -175,9 +126,9 @@ export default function PreStartView() {
       const nowStr   = new Date().toISOString().slice(0, 13)
       const startIdx = times.findIndex(t => t.slice(0, 13) >= nowStr)
       const slice    = times.slice(startIdx, startIdx + 13).map((t, i) => {
-        const idx  = startIdx + i
-        const d    = new Date(t)
-        const hh   = String(d.getHours()).padStart(2, '0')
+        const idx = startIdx + i
+        const d   = new Date(t)
+        const hh  = String(d.getHours()).padStart(2, '0')
         return { label: `${hh}:00`, dir: Math.round(dirs[idx]), spd: spds[idx], gust: gusts[idx] }
       }).filter(h => h.spd !== null && h.dir !== null)
 
@@ -185,18 +136,13 @@ export default function PreStartView() {
       setCurrent(slice[0])
       setHours(slice)
       setStatus('done')
-      // Persist results so they survive tab switches
       localStorage.setItem('v2_prestart_result', JSON.stringify({ location: loc, hours: slice, fetchedAt: Date.now() }))
     } catch {
       setStatus('error'); setErrorMsg('Network error')
     }
   }
 
-  const dirText  = current ? `${String(current.dir).padStart(3,'0')}°` : '—°'
-  const spdText  = current ? `${mpsToKnots(current.spd).toFixed(1)}` : '—'
-  const gustText = current ? `${mpsToKnots(current.gust).toFixed(1)}` : '—'
-
-  // Only show office hours (09:00–17:00); always include the current hour (NOW)
+  // Office hours 09-17 + always show NOW (index 0)
   const officeHours = hours.filter((h, i) => {
     if (i === 0) return true
     const hh = parseInt(h.label)
@@ -204,51 +150,46 @@ export default function PreStartView() {
   })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: '#000' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', background: C.bg }}>
 
-      {/* Header */}
-      <div style={{ flexShrink: 0, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)' }}>PRE-START</span>
-        <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>{time}</span>
-      </div>
-
-      {/* Search */}
-      <div style={{ flexShrink: 0, display: 'flex', gap: 8, padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+      {/* Search row */}
+      <div style={{ display: 'flex', gap: 8, padding: '10px 12px', flexShrink: 0 }}>
         <input
           value={query}
           onChange={e => { setQuery(e.target.value); localStorage.setItem('v2_prestart_city', e.target.value) }}
           onKeyDown={e => e.key === 'Enter' && search()}
-          placeholder="City or race area…"
+          placeholder="Race area city…"
           style={{
-            flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.2)',
-            color: '#fff', fontFamily: 'monospace', fontSize: 13, padding: '8px 10px', outline: 'none',
+            flex: 1, background: C.card, border: `1px solid ${C.sep}`,
+            color: C.text, fontFamily: F.bc, fontSize: 14, fontWeight: 500,
+            padding: '10px 12px', outline: 'none', borderRadius: 4,
           }}
         />
-        <button onClick={search} style={{
-          padding: '8px 16px', background: status === 'loading' ? 'rgba(255,255,255,0.1)' : '#fff',
-          border: 'none', color: '#000', fontFamily: 'monospace', fontWeight: 700,
-          fontSize: 12, letterSpacing: '0.1em', cursor: 'pointer', flexShrink: 0,
+        <button onClick={search} disabled={status === 'loading'} style={{
+          padding: '10px 18px', background: status === 'loading' ? C.cyanDim : C.cyan,
+          border: 'none', color: C.bg, fontFamily: F.bc, fontWeight: 700,
+          fontSize: 12, letterSpacing: '0.15em', cursor: 'pointer', flexShrink: 0, borderRadius: 4,
         }}>{status === 'loading' ? '…' : 'SEARCH'}</button>
       </div>
 
       {/* Location label */}
       {location && (
-        <div style={{ flexShrink: 0, padding: '4px 14px' }}>
-          <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.06em' }}>{location.name}</span>
+        <div style={{ padding: '2px 14px 6px', flexShrink: 0 }}>
+          <span style={{ fontSize: 10, fontFamily: F.bc, fontWeight: 600, color: C.textSub, letterSpacing: '0.08em' }}>{location.name}</span>
         </div>
       )}
 
       {/* Error */}
       {status === 'error' && (
-        <div style={{ padding: '10px 14px' }}>
-          <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(255,100,100,0.8)' }}>{errorMsg}</span>
+        <div style={{ padding: '8px 14px' }}>
+          <span style={{ fontSize: 12, fontFamily: F.bc, color: C.neg }}>{errorMsg}</span>
         </div>
       )}
 
       {/* Idle placeholder */}
       {status === 'idle' && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.2)', letterSpacing: '0.1em', textAlign: 'center', padding: '0 20px' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 120 }}>
+          <span style={{ fontSize: 11, fontFamily: F.bc, fontWeight: 600, color: C.textDim, letterSpacing: '0.15em', textAlign: 'center', padding: '0 20px' }}>
             ENTER RACE AREA TO GET FORECAST
           </span>
         </div>
@@ -256,51 +197,68 @@ export default function PreStartView() {
 
       {status === 'done' && current && (
         <>
-          {/* Current conditions — white tile, capped so it doesn't dominate the screen */}
-          <div style={{ flexShrink: 0, height: 'min(110px, 20%)', background: '#fff', display: 'flex', alignItems: 'stretch', borderBottom: '2px solid #000' }}>
-            <BigNum value={dirText} label="DIRECTION" sub={current ? compassLabel(current.dir) : ''} />
-            <div style={{ width: 1, background: 'rgba(0,0,0,0.12)' }} />
-            <BigNum value={spdText} label="WIND KTS" />
-            <div style={{ width: 1, background: 'rgba(0,0,0,0.12)' }} />
-            <BigNum value={gustText} label="GUST KTS" />
-          </div>
+          <SL label="CURRENT CONDITIONS" />
 
-          {/* Direction trend chart — dark */}
-          <div style={{ flexShrink: 0, height: 'min(85px, 14%)', background: '#000', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ padding: '3px 0 0 10px', fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.3)' }}>
-              WIND DIRECTION — NEXT 12H
-            </div>
-            <div style={{ height: 'calc(100% - 16px)' }}>
-              <DirChart hours={hours} />
-            </div>
-          </div>
-
-          {/* Hourly list — 09:00–17:00 only */}
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-            {officeHours.map((h, i) => (
+          {/* 3-col big numbers */}
+          <div style={{ display: 'flex', background: C.card, flexShrink: 0 }}>
+            {[
+              { label: 'DIR', val: `${current.dir}`, unit: '°', sub: compassLabel(current.dir) },
+              { label: 'WIND', val: `${mpsToKnots(current.spd).toFixed(1)}`, unit: 'kts' },
+              { label: 'GUST', val: `${mpsToKnots(current.gust).toFixed(1)}`, unit: 'kts' },
+            ].map(({ label, val, unit, sub }, i) => (
               <div key={i} style={{
-                display: 'flex', alignItems: 'center', padding: '9px 14px',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                background: i === 0 ? 'rgba(255,255,255,0.07)' : 'transparent',
+                flex: 1,
+                padding: '12px 10px',
+                textAlign: 'center',
+                borderLeft: i > 0 ? `1px solid ${C.sep}` : 'none',
               }}>
-                <span style={{ width: 44, fontSize: 13, fontFamily: 'monospace', fontWeight: 700, color: i === 0 ? '#fff' : 'rgba(255,255,255,0.5)' }}>
-                  {i === 0 ? 'NOW' : h.label}
-                </span>
-                <span style={{ width: 54, fontSize: 14, fontFamily: 'monospace', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
-                  {String(h.dir).padStart(3,'0')}°
-                </span>
-                <span style={{ width: 32, fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)', marginRight: 6 }}>
-                  {compassLabel(h.dir)}
-                </span>
-                <span style={{ flex: 1, fontSize: 13, fontFamily: 'monospace', color: '#fff' }}>
-                  {mpsToKnots(h.spd).toFixed(1)} kts
-                </span>
-                <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)' }}>
-                  G {mpsToKnots(h.gust).toFixed(1)}
-                </span>
+                <div style={{ fontSize: 9, fontFamily: F.bc, fontWeight: 700, letterSpacing: '0.22em', color: C.textDim, textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 54, fontFamily: F.bc, fontWeight: 800, color: C.text, lineHeight: 1, letterSpacing: '-0.02em', textShadow: NUM_SHADOW }}>
+                    {val}
+                  </span>
+                  <span style={{ fontSize: 14, fontFamily: F.bc, fontWeight: 700, color: C.cyan, marginBottom: 6, marginLeft: 3 }}>{unit}</span>
+                </div>
+                {sub && <div style={{ fontSize: 11, fontFamily: F.bc, fontWeight: 600, color: C.textSub, marginTop: 4 }}>{sub}</div>}
               </div>
             ))}
           </div>
+
+          <SL label="SHIFT NEXT 12H" right="← LEFT / RIGHT →" />
+          <div style={{ height: 72, flexShrink: 0 }}>
+            <ShiftChart hours={hours.slice(0, 12)} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 14px', flexShrink: 0 }}>
+            <span style={{ fontSize: 9, fontFamily: F.bc, fontWeight: 600, color: C.textDim }}>NOW</span>
+            <span style={{ fontSize: 9, fontFamily: F.bc, fontWeight: 600, color: C.textDim }}>+12h</span>
+          </div>
+
+          <SL label="HOURLY FORECAST (09–17)" />
+          {officeHours.map((h, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', padding: '9px 14px',
+              background: i % 2 === 0 ? C.card : C.cardAlt,
+              borderBottom: `1px solid ${C.sep}`,
+            }}>
+              <span style={{ width: 40, fontSize: 12, fontFamily: F.bc, fontWeight: 700, color: i === 0 ? C.cyan : C.textSub, letterSpacing: '0.05em' }}>
+                {i === 0 ? 'NOW' : h.label}
+              </span>
+              <span style={{ width: 52, fontSize: 20, fontFamily: F.bc, fontWeight: 800, color: C.text, letterSpacing: '-0.01em' }}>
+                {h.dir}°
+              </span>
+              <span style={{ width: 34, fontSize: 11, fontFamily: F.bc, fontWeight: 600, color: C.textSub }}>
+                {compassLabel(h.dir)}
+              </span>
+              <span style={{ flex: 1, fontSize: 18, fontFamily: F.bc, fontWeight: 800, color: C.text }}>
+                {mpsToKnots(h.spd).toFixed(1)}
+              </span>
+              <span style={{ fontSize: 11, fontFamily: F.bc, fontWeight: 600, color: C.cyan, marginRight: 10 }}>kts</span>
+              <span style={{ fontSize: 11, fontFamily: F.bc, fontWeight: 600, color: C.neg }}>
+                G{mpsToKnots(h.gust).toFixed(1)}
+              </span>
+            </div>
+          ))}
+          <div style={{ height: 16 }} />
         </>
       )}
     </div>

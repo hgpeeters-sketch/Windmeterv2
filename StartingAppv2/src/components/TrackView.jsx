@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { getApiKey } from '../anthropic'
-
-// ── Geo helpers ──────────────────────────────────────────────────────────────
+import { C, F, NUM_SHADOW } from '../theme'
 
 function haversineM(p1, p2) {
   const toRad = d => d * Math.PI / 180
@@ -19,8 +18,6 @@ function fmtDur(ms) {
   if (h > 0) return `${h}h ${String(m % 60).padStart(2,'0')}m`
   return `${String(m).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`
 }
-
-// ── Track stats ───────────────────────────────────────────────────────────────
 
 function computeStats(pts, twd) {
   if (pts.length < 2) return null
@@ -47,12 +44,10 @@ function computeStats(pts, twd) {
   return {
     dur, distNm: distM / 1852, tacks,
     stbdMin: stbdMs / 60000, portMin: portMs / 60000,
-    stbdAvg: avg(stbdSpd),  portAvg: avg(portSpd),
+    stbdAvg: avg(stbdSpd),   portAvg: avg(portSpd),
     maxSpd:  pts.reduce((m,p) => (p.speed&&p.speed>m ? p.speed : m), 0),
   }
 }
-
-// ── GPX export ────────────────────────────────────────────────────────────────
 
 function buildGPX(pts) {
   const lines = pts.map(p =>
@@ -63,13 +58,10 @@ function buildGPX(pts) {
     </trkpt>`
   ).join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="WindMeter v2" xmlns="http://www.topografix.com/GPX/1/1">
-  <trk>
-    <name>Race ${new Date(pts[0].time).toISOString().slice(0,10)}</name>
-    <trkseg>
+<gpx version="1.1" creator="WindMeter v3">
+  <trk><name>Race ${new Date(pts[0].time).toISOString().slice(0,10)}</name><trkseg>
 ${lines}
-    </trkseg>
-  </trk>
+  </trkseg></trk>
 </gpx>`
 }
 
@@ -84,8 +76,6 @@ function downloadGPX(pts) {
   document.body.appendChild(a); a.click()
   document.body.removeChild(a); URL.revokeObjectURL(url)
 }
-
-// ── AI analysis ───────────────────────────────────────────────────────────────
 
 async function analyzeRace(pts, windSamples, twd) {
   const key = getApiKey()
@@ -152,10 +142,16 @@ Direct sailing language. No intro fluff.`
   return data.content?.[0]?.text ?? 'No response received.'
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+const SL = ({ label, right }) => (
+  <div style={{
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '7px 14px', borderBottom: `1px solid ${C.sep}`, flexShrink: 0,
+  }}>
+    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
+    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, color: right.startsWith('●') ? '#ff4444' : C.textDim }}>{right}</span>}
+  </div>
+)
 
-// twd is passed as the raw manualTwd value (null when not set) so we can
-// distinguish "no TWD logged" from "TWD = 0°" (a valid north wind reading)
 export default function TrackView({ remaining, twd, samples }) {
   const [recording, setRecording]   = useState(false)
   const [pts, setPts]               = useState(() => {
@@ -166,7 +162,6 @@ export default function TrackView({ remaining, twd, samples }) {
   const [analysis, setAnalysis]     = useState(() => localStorage.getItem('v2_trackAnalysis') ?? '')
   const [analysing, setAnalysing]   = useState(false)
   const [aiError, setAiError]       = useState('')
-  const [time, setTime]             = useState('')
 
   const recordingRef = useRef(false)
   const startRef     = useRef(null)
@@ -175,25 +170,16 @@ export default function TrackView({ remaining, twd, samples }) {
 
   useEffect(() => { twdRef.current = twd }, [twd])
 
-  // Clock
-  useEffect(() => {
-    const tick = () => setTime(new Date().toTimeString().slice(0,8))
-    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
-  }, [])
-
-  // Elapsed while recording
   useEffect(() => {
     if (!recording) return
     const id = setInterval(() => setElapsed(Date.now() - startRef.current), 1000)
     return () => clearInterval(id)
   }, [recording])
 
-  // Auto-start at gun (remaining === 0 and no existing track)
   useEffect(() => {
     if (remaining === 0 && !recording && pts.length === 0) startRecording()
   }, [remaining])
 
-  // GPS
   useEffect(() => {
     if (!navigator.geolocation) return
     const id = navigator.geolocation.watchPosition(pos => {
@@ -202,7 +188,7 @@ export default function TrackView({ remaining, twd, samples }) {
       if (!recordingRef.current) return
       const now  = Date.now()
       const last = lastPtRef.current
-      if (last && now - last.time < 4500) return   // ~5 s interval
+      if (last && now - last.time < 4500) return
       const pt = {
         time: now,
         lat:  pos.coords.latitude,
@@ -249,137 +235,145 @@ export default function TrackView({ remaining, twd, samples }) {
   const hasTrack = pts.length >= 2
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', background:'#000' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', background: C.bg }}>
 
-      {/* Header */}
-      <div style={{ flexShrink:0, height:36, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 14px', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>
-        <span style={{ fontSize:11, fontWeight:700, fontFamily:'monospace', letterSpacing:'0.25em', color: recording ? '#ff4444' : 'rgba(255,255,255,0.4)' }}>
-          {recording ? '● REC' : 'TRACK'}
-        </span>
-        <span style={{ fontSize:16, fontWeight:700, fontFamily:'monospace', color:'#fff' }}>{time}</span>
-      </div>
+      <SL label="TRACK RECORDER" right={recording ? `● ${fmtDur(elapsed)}` : hasTrack ? fmtDur(stats?.dur ?? 0) : undefined} />
 
-      {/* Control row */}
-      <div style={{ flexShrink:0, background:'#fff', padding:'12px 14px', display:'flex', alignItems:'center', gap:12 }}>
-        {!recording
-          ? <button onClick={startRecording} style={ctrlBtn('#000','#fff')}>● START RECORDING</button>
-          : <button onClick={stopRecording}  style={ctrlBtn('#cc2222','#fff')}>■ STOP</button>
-        }
-        <div style={{ textAlign:'right', flexShrink:0 }}>
-          <div style={{ fontSize:24, fontFamily:'monospace', fontWeight:900, color:'#000', lineHeight:1 }}>
-            {recording ? fmtDur(elapsed) : hasTrack ? fmtDur(stats?.dur??0) : '00:00'}
-          </div>
-          <div style={{ fontSize:9, fontFamily:'monospace', color:'rgba(0,0,0,0.4)', marginTop:2 }}>
-            {recording
-              ? `${pts.length} pts · ${liveSpd?.toFixed(1)??'—'} kts`
-              : hasTrack ? `${pts.length} pts · ${stats?.distNm?.toFixed(2)??'—'} nm` : 'no recording'
-            }
-          </div>
-        </div>
+      {/* Record control */}
+      <div style={{ background: C.card, padding: '14px', borderBottom: `1px solid ${C.sep}`, flexShrink: 0 }}>
+        {!recording ? (
+          <>
+            {!hasTrack && (
+              <div style={{ marginBottom: 10, fontSize: 12, fontFamily: F.bc, fontWeight: 600, color: C.textSub, lineHeight: 1.6 }}>
+                {remaining === 0
+                  ? 'Timer complete — recording started automatically.'
+                  : 'Recording starts automatically at gun, or tap below.'}
+              </div>
+            )}
+            <button onClick={startRecording} style={{
+              width: '100%', padding: '15px 0',
+              background: C.cyanDim, border: `1px solid ${C.cyan}`, borderRadius: 6,
+              color: C.cyan, fontFamily: F.bc, fontWeight: 700,
+              fontSize: 14, letterSpacing: '0.18em', cursor: 'pointer',
+            }}>▶ START RECORDING</button>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff4444' }} />
+              <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 13, color: '#ff4444', letterSpacing: '0.1em' }}>
+                RECORDING · {pts.length} pts · {liveSpd?.toFixed(1) ?? '—'} kts
+              </span>
+            </div>
+            <button onClick={stopRecording} style={{
+              width: '100%', padding: '15px 0',
+              background: 'rgba(255,51,51,0.15)', border: '1px solid #ff4444', borderRadius: 6,
+              color: '#ff4444', fontFamily: F.bc, fontWeight: 700,
+              fontSize: 14, letterSpacing: '0.18em', cursor: 'pointer',
+            }}>■ STOP RECORDING</button>
+          </>
+        )}
       </div>
 
       {/* Stats strip */}
       {(recording || hasTrack) && (
-        <div style={{ flexShrink:0, display:'flex', borderBottom:'1px solid rgba(255,255,255,0.08)', background:'#000' }}>
-          {recording ? <>
-            <Stat label="SPEED"  v={liveSpd!==null ? `${liveSpd.toFixed(1)} kts` : '— kts'} />
-            <Stat label="TACKS"  v={`${stats?.tacks??0}`} />
-            <Stat label="TWD"    v={twd!=null ? `${twd}°` : 'LOG IN AREA'} />
-          </> : <>
-            <Stat label="DIST"   v={`${stats?.distNm?.toFixed(2)??'—'} nm`} />
-            <Stat label="TACKS"  v={`${stats?.tacks??'—'}`} />
-            <Stat label="MAX"    v={`${stats?.maxSpd?.toFixed(1)??'—'} kts`} />
-          </>}
-        </div>
-      )}
-
-      {/* Tack breakdown — only after recording */}
-      {!recording && hasTrack && stats && (
-        <div style={{ flexShrink:0, display:'flex', borderBottom:'1px solid rgba(255,255,255,0.08)', background:'#000' }}>
-          <Stat label="STBD"
-            v={`${stats.stbdMin.toFixed(0)} min`}
-            sub={stats.stbdAvg ? `${stats.stbdAvg.toFixed(1)} kts avg` : null} />
-          <Stat label="PORT"
-            v={`${stats.portMin.toFixed(0)} min`}
-            sub={stats.portAvg ? `${stats.portAvg.toFixed(1)} kts avg` : null} />
-        </div>
-      )}
-
-      {/* Action buttons */}
-      {!recording && hasTrack && (
-        <div style={{ flexShrink:0, display:'flex', gap:8, padding:'10px 14px', background:'#000', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>
-          <button onClick={() => downloadGPX(pts)} style={actionBtn(false, false)}>EXPORT GPX</button>
-          <button onClick={runAnalysis} disabled={analysing} style={actionBtn(true, analysing)}>
-            {analysing ? 'ANALYSING…' : '✦ ANALYSE RACE'}
-          </button>
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!recording && !hasTrack && !analysis && (
-        <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 28px' }}>
-          <span style={{ fontSize:11, fontFamily:'monospace', color:'rgba(255,255,255,0.2)', letterSpacing:'0.08em', textAlign:'center', lineHeight:2 }}>
-            RECORDING STARTS AUTOMATICALLY AT GUN{'\n'}OR TAP START TO RECORD MANUALLY
-          </span>
-        </div>
-      )}
-
-      {/* AI analysis */}
-      {(analysis || aiError) && (
-        <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:'14px' }}>
-          {aiError && (
-            <div style={{ fontSize:11, fontFamily:'monospace', color:'rgba(255,100,100,0.85)', marginBottom:12 }}>
-              {aiError}
-            </div>
-          )}
-          {analysis && (
+        <div style={{ display: 'flex', background: C.cardAlt, borderBottom: `1px solid ${C.sep}`, flexShrink: 0 }}>
+          {recording ? (
             <>
-              <div style={{ fontSize:9, fontFamily:'monospace', letterSpacing:'0.2em', color:'rgba(255,255,255,0.3)', marginBottom:12 }}>
-                AI RACE DEBRIEF
-              </div>
-              <div style={{ fontSize:13, fontFamily:'monospace', color:'rgba(255,255,255,0.88)', lineHeight:1.8, whiteSpace:'pre-wrap' }}>
-                {analysis}
-              </div>
-              <div style={{ marginTop:16 }}>
-                <button onClick={runAnalysis} disabled={analysing} style={actionBtn(true, analysing)}>
-                  {analysing ? 'ANALYSING…' : '↺ RE-ANALYSE'}
-                </button>
-              </div>
+              <StatCell label="SPEED"  v={liveSpd !== null ? liveSpd.toFixed(1) : '—'} unit="kts" />
+              <StatCell label="TACKS"  v={`${stats?.tacks ?? 0}`} />
+              <StatCell label="TWD"    v={twd != null ? `${twd}` : '—'} unit={twd != null ? '°' : undefined} />
+            </>
+          ) : (
+            <>
+              <StatCell label="DIST"   v={stats?.distNm?.toFixed(2) ?? '—'} unit="nm" />
+              <StatCell label="TACKS"  v={`${stats?.tacks ?? '—'}`} />
+              <StatCell label="MAX"    v={stats?.maxSpd?.toFixed(1) ?? '—'} unit="kts" />
             </>
           )}
         </div>
       )}
 
+      {/* Tack breakdown */}
+      {!recording && hasTrack && stats && (
+        <div style={{ display: 'flex', background: C.card, borderBottom: `1px solid ${C.sep}`, flexShrink: 0 }}>
+          <StatCell label="STBD" v={stats.stbdMin.toFixed(0)} unit="min"
+            sub={stats.stbdAvg ? `${stats.stbdAvg.toFixed(1)} kts avg` : undefined} />
+          <StatCell label="PORT" v={stats.portMin.toFixed(0)} unit="min"
+            sub={stats.portAvg ? `${stats.portAvg.toFixed(1)} kts avg` : undefined} />
+        </div>
+      )}
+
+      {/* Action buttons */}
+      {!recording && hasTrack && (
+        <div style={{ display: 'flex', gap: 10, padding: '12px', flexShrink: 0 }}>
+          <button onClick={() => downloadGPX(pts)} style={{
+            flex: 1, padding: '13px 0',
+            background: 'transparent', border: `1px solid ${C.sep}`, borderRadius: 6,
+            color: C.textSub, fontFamily: F.bc, fontWeight: 700,
+            fontSize: 11, letterSpacing: '0.12em', cursor: 'pointer',
+          }}>EXPORT GPX</button>
+          <button onClick={runAnalysis} disabled={analysing} style={{
+            flex: 2, padding: '13px 0',
+            background: analysing ? C.cyanDim : C.cyanDim,
+            border: `1px solid ${analysing ? C.sep : C.cyan}`, borderRadius: 6,
+            color: analysing ? C.textDim : C.cyan,
+            fontFamily: F.bc, fontWeight: 700,
+            fontSize: 11, letterSpacing: '0.12em', cursor: analysing ? 'default' : 'pointer',
+          }}>{analysing ? 'ANALYSING…' : '✦ AI RACE DEBRIEF'}</button>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!recording && !hasTrack && (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px' }}>
+          <span style={{ fontSize: 11, fontFamily: F.bc, fontWeight: 600, color: C.textDim, letterSpacing: '0.1em', textAlign: 'center', lineHeight: 2.2 }}>
+            RECORDING STARTS AT GUN{'\n'}OR TAP START ABOVE
+          </span>
+        </div>
+      )}
+
+      {/* AI error */}
+      {aiError && (
+        <div style={{ padding: '12px 14px' }}>
+          <span style={{ fontSize: 12, fontFamily: F.bc, fontWeight: 600, color: C.neg }}>{aiError}</span>
+        </div>
+      )}
+
+      {/* AI analysis */}
+      {analysis && (
+        <div style={{ background: C.card, margin: 0, flexShrink: 0 }}>
+          <div style={{ padding: '7px 14px', borderBottom: `1px solid ${C.sep}`, borderTop: `1px solid ${C.sep}` }}>
+            <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim }}>AI RACE DEBRIEF</span>
+          </div>
+          <div style={{ padding: '14px', fontSize: 13, fontFamily: F.b, color: C.text, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+            {analysis}
+          </div>
+          <div style={{ padding: '0 14px 14px' }}>
+            <button onClick={runAnalysis} disabled={analysing} style={{
+              width: '100%', padding: '11px 0',
+              background: 'transparent', border: `1px solid ${C.sep}`, borderRadius: 6,
+              color: C.textSub, fontFamily: F.bc, fontWeight: 700,
+              fontSize: 11, letterSpacing: '0.12em', cursor: 'pointer',
+            }}>{analysing ? 'ANALYSING…' : '↺ RE-ANALYSE'}</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ height: 16 }} />
     </div>
   )
 }
 
-function Stat({ label, v, sub }) {
+function StatCell({ label, v, unit, sub }) {
   return (
-    <div style={{ flex:1, padding:'8px 0', textAlign:'center' }}>
-      <div style={{ fontSize:8, fontFamily:'monospace', letterSpacing:'0.15em', color:'rgba(255,255,255,0.3)', marginBottom:3 }}>{label}</div>
-      <div style={{ fontSize:13, fontFamily:'monospace', fontWeight:700, color:'#fff' }}>{v}</div>
-      {sub && <div style={{ fontSize:9, fontFamily:'monospace', color:'rgba(255,255,255,0.35)', marginTop:2 }}>{sub}</div>}
+    <div style={{ flex: 1, padding: '10px', textAlign: 'center', borderRight: `1px solid ${C.sep}` }}>
+      <div style={{ fontSize: 9, fontFamily: F.bc, fontWeight: 700, letterSpacing: '0.2em', color: C.textDim, textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+        <span style={{ fontSize: 28, fontFamily: F.bc, fontWeight: 800, color: C.text, lineHeight: 1 }}>{v}</span>
+        {unit && <span style={{ fontSize: 11, fontFamily: F.bc, fontWeight: 700, color: C.cyan, marginBottom: 3, marginLeft: 2 }}>{unit}</span>}
+      </div>
+      {sub && <div style={{ fontSize: 10, fontFamily: F.bc, fontWeight: 600, color: C.textSub, marginTop: 3 }}>{sub}</div>}
     </div>
   )
-}
-
-function ctrlBtn(bg, color) {
-  return {
-    flex:1, padding:'14px 0',
-    background: bg, border:'none', color,
-    fontFamily:'monospace', fontWeight:700, fontSize:12,
-    letterSpacing:'0.15em', cursor:'pointer',
-  }
-}
-
-function actionBtn(primary, disabled) {
-  return {
-    flex: primary ? 2 : 1, padding:'12px 0',
-    background: disabled ? 'rgba(255,255,255,0.08)' : primary ? '#fff' : 'transparent',
-    border: primary ? 'none' : '1px solid rgba(255,255,255,0.3)',
-    color: disabled ? 'rgba(255,255,255,0.4)' : primary ? '#000' : 'rgba(255,255,255,0.8)',
-    fontFamily:'monospace', fontWeight:700, fontSize:11,
-    letterSpacing:'0.1em', cursor: disabled ? 'default' : 'pointer',
-  }
 }

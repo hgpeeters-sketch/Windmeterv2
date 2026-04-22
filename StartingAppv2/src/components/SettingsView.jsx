@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getApiKey, setApiKey } from '../anthropic'
+import { C, F } from '../theme'
 
 const ROLL_RATES = [
   { label: 'FAST',      ms: 150  },
@@ -21,13 +22,33 @@ const TIMER_OPTS = [
   { label: '10 MIN', min: 10 },
 ]
 
-function Row({ label, children }) {
+const SL = ({ label }) => (
+  <div style={{ padding: '8px 14px 7px', borderBottom: `1px solid ${C.sep}` }}>
+    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
+  </div>
+)
+
+function PillGroup({ options, value, onChange, keyProp }) {
   return (
-    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '16px' }}>
-      <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.4)', marginBottom: 10 }}>
-        {label}
-      </div>
-      {children}
+    <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: `1px solid ${C.sep}` }}>
+      {options.map((opt, i) => {
+        const active = opt[keyProp] === value
+        return (
+          <button
+            key={opt[keyProp]}
+            onClick={() => onChange(opt[keyProp])}
+            style={{
+              flex: 1, padding: '10px 4px',
+              background: active ? C.cyanDim : C.card,
+              border: 'none',
+              borderRight: i < options.length - 1 ? `1px solid ${C.sep}` : 'none',
+              color: active ? C.cyan : C.textSub,
+              fontFamily: F.bc, fontWeight: 700, fontSize: 10,
+              letterSpacing: '0.08em', cursor: 'pointer',
+            }}
+          >{opt.label}</button>
+        )
+      })}
     </div>
   )
 }
@@ -70,83 +91,35 @@ export default function SettingsView() {
   const hasKey = key.trim().length > 0
   const masked = hasKey ? key.trim().slice(0, 10) + '••••••••••••••••' : ''
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#000', overflowY: 'auto' }}>
+  const section = { background: C.card, padding: '14px', borderBottom: `1px solid ${C.sep}` }
+  const hint    = { marginTop: 8, fontSize: 11, fontFamily: F.bc, fontWeight: 500, color: C.textDim, lineHeight: 1.6 }
 
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)' }}>
-          SETTINGS
-        </span>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: C.bg, overflowY: 'auto' }}>
+
+      <SL label="START TIMER DURATION" />
+      <div style={section}>
+        <PillGroup options={TIMER_OPTS} value={timerMin} onChange={selectTimer} keyProp="min" />
+        <div style={hint}>Takes effect on next RESET. Default is 5 minutes.</div>
       </div>
 
-      <Row label="START TIMER DURATION">
-        <div style={{ display: 'flex', gap: 8 }}>
-          {TIMER_OPTS.map(({ label, min }) => (
-            <button
-              key={min}
-              onClick={() => selectTimer(min)}
-              style={{
-                flex: 1, padding: '10px 4px',
-                background: timerMin === min ? '#fff' : 'transparent',
-                border: `1px solid rgba(255,255,255,${timerMin === min ? 1 : 0.25})`,
-                color: timerMin === min ? '#000' : 'rgba(255,255,255,0.55)',
-                fontFamily: 'monospace', fontWeight: 700, fontSize: 10,
-                letterSpacing: '0.05em', cursor: 'pointer',
-              }}
-            >{label}</button>
-          ))}
+      <SL label="BEEP VOLUME" />
+      <div style={section}>
+        <PillGroup options={BEEP_VOLS} value={beepDb} onChange={selectBeepVol} keyProp="db" />
+        <div style={hint}>
+          {beepDb === -12 ? '−12 dB' : beepDb === -6 ? '−6 dB' : beepDb === 0 ? '0 dB (default)' : '+6 dB'}
+          {' · '}Controls timer signal volume.
         </div>
-        <div style={{ marginTop: 8, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>
-          Takes effect on next RESET. Default is 5 minutes.
-        </div>
-      </Row>
+      </div>
 
-      <Row label="BEEP VOLUME">
-        <div style={{ display: 'flex', gap: 8 }}>
-          {BEEP_VOLS.map(({ label, db }) => (
-            <button
-              key={db}
-              onClick={() => selectBeepVol(db)}
-              style={{
-                flex: 1, padding: '10px 4px',
-                background: beepDb === db ? '#fff' : 'transparent',
-                border: `1px solid rgba(255,255,255,${beepDb === db ? 1 : 0.25})`,
-                color: beepDb === db ? '#000' : 'rgba(255,255,255,0.55)',
-                fontFamily: 'monospace', fontWeight: 700, fontSize: 10,
-                letterSpacing: '0.05em', cursor: 'pointer',
-              }}
-            >{label}</button>
-          ))}
-        </div>
-        <div style={{ marginTop: 8, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>
-          {beepDb === -12 ? '−12 dB' : beepDb === -6 ? '−6 dB' : beepDb === 0 ? '0 dB (default)' : '+6 dB'} · Controls timer signal volume. Tap START to test.
-        </div>
-      </Row>
+      <SL label="ROLL REFRESH RATE" />
+      <div style={section}>
+        <PillGroup options={ROLL_RATES} value={rollMs} onChange={selectRollRate} keyProp="ms" />
+        <div style={hint}>Controls how often the heel reading updates in RACE. Slower = smoother.</div>
+      </div>
 
-      <Row label="ROLL REFRESH RATE">
-        <div style={{ display: 'flex', gap: 8 }}>
-          {ROLL_RATES.map(({ label, ms }) => (
-            <button
-              key={ms}
-              onClick={() => selectRollRate(ms)}
-              style={{
-                flex: 1, padding: '10px 4px',
-                background: rollMs === ms ? '#fff' : 'transparent',
-                border: `1px solid rgba(255,255,255,${rollMs === ms ? 1 : 0.25})`,
-                color: rollMs === ms ? '#000' : 'rgba(255,255,255,0.55)',
-                fontFamily: 'monospace', fontWeight: 700, fontSize: 10,
-                letterSpacing: '0.05em', cursor: 'pointer',
-              }}
-            >{label}</button>
-          ))}
-        </div>
-        <div style={{ marginTop: 8, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>
-          Controls how often the roll number updates on the Racing screen.
-          Slower = smoother but less responsive.
-        </div>
-      </Row>
-
-      <Row label="ANTHROPIC API KEY">
+      <SL label="ANTHROPIC API KEY" />
+      <div style={section}>
         <input
           value={key}
           onChange={e => { setKey(e.target.value); setSaved(false) }}
@@ -154,14 +127,13 @@ export default function SettingsView() {
           type="password"
           style={{
             width: '100%', boxSizing: 'border-box',
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            color: '#fff', fontFamily: 'monospace', fontSize: 13,
-            padding: '10px 12px', outline: 'none',
+            background: C.cardAlt, border: `1px solid ${C.sep}`,
+            color: C.text, fontFamily: F.b, fontSize: 13,
+            padding: '10px 12px', outline: 'none', borderRadius: 4,
           }}
         />
         {hasKey && (
-          <div style={{ marginTop: 6, fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>
+          <div style={{ marginTop: 6, fontSize: 11, fontFamily: F.bc, fontWeight: 600, color: C.textSub }}>
             Stored: {masked}
           </div>
         )}
@@ -169,26 +141,23 @@ export default function SettingsView() {
           onClick={save}
           style={{
             marginTop: 12, width: '100%', padding: '14px 0',
-            background: saved ? 'rgba(255,255,255,0.15)' : '#fff',
-            border: 'none', color: saved ? '#fff' : '#000',
-            fontFamily: 'monospace', fontWeight: 700, fontSize: 13,
+            background: saved ? C.cyanDim : C.cyan,
+            border: `1px solid ${C.cyan}`, borderRadius: 6,
+            color: saved ? C.cyan : C.bg,
+            fontFamily: F.bc, fontWeight: 700, fontSize: 13,
             letterSpacing: '0.15em', cursor: 'pointer',
           }}
-        >
-          {saved ? '✓  SAVED' : 'SAVE KEY'}
-        </button>
-        <div style={{ marginTop: 10, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)', lineHeight: 1.7 }}>
-          Get your key at console.anthropic.com — stored locally on this device only.
-        </div>
-      </Row>
+        >{saved ? '✓  SAVED' : 'SAVE KEY'}</button>
+        <div style={hint}>Get your key at console.anthropic.com — stored locally on this device only.</div>
+      </div>
 
-      <Row label="ABOUT">
-        <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(255,255,255,0.5)', lineHeight: 1.8 }}>
-          <div>WindMeter v2.1</div>
-          <div style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11 }}>Manual TWD · Claude AI</div>
-        </div>
-      </Row>
+      <SL label="ABOUT" />
+      <div style={{ ...section, borderBottom: 'none' }}>
+        <div style={{ fontSize: 24, fontFamily: F.bc, fontWeight: 800, color: C.text, marginBottom: 4 }}>WindMeter v3.0</div>
+        <div style={{ fontSize: 12, fontFamily: F.bc, fontWeight: 600, color: C.textSub, letterSpacing: '0.08em' }}>Manual TWD · Claude AI</div>
+      </div>
 
+      <div style={{ height: 20 }} />
     </div>
   )
 }

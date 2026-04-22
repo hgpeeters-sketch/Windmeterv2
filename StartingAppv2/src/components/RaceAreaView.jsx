@@ -1,4 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
+import { C, F, NUM_SHADOW } from '../theme'
+
+function compassLabel(deg) {
+  const pts = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']
+  return pts[Math.round(((deg % 360) + 360) % 360 / 22.5) % 16]
+}
 
 function haversineDistance(p1, p2) {
   const toRad = d => d * Math.PI / 180
@@ -9,22 +15,16 @@ function haversineDistance(p1, p2) {
   return Math.round(2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)))
 }
 
-function compassLabel(deg) {
-  const pts = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']
-  return pts[Math.round(((deg % 360) + 360) % 360 / 22.5) % 16]
-}
-
-function fitFontSize(text, W, H, weight = '900') {
-  const canvas = document.createElement('canvas')
-  const ctx = canvas.getContext('2d')
-  let fs = Math.floor(H * 0.88)
-  while (fs > 16) {
-    ctx.font = `${weight} ${fs}px monospace`
-    if (ctx.measureText(text).width <= W - 8) break
-    fs -= 2
-  }
-  return fs
-}
+const SL = ({ label, right }) => (
+  <div style={{
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '7px 14px', borderBottom: `1px solid ${C.sep}`,
+    flexShrink: 0,
+  }}>
+    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
+    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, color: C.textDim }}>{right}</span>}
+  </div>
+)
 
 function WindHistoryChart({ samples }) {
   const containerRef = useRef(null)
@@ -47,8 +47,9 @@ function WindHistoryChart({ samples }) {
       const recent = samples.filter(s => s.time >= cutoff)
 
       if (recent.length < 1) {
-        ctx.fillStyle = 'rgba(255,255,255,0.18)'
-        ctx.font = '11px monospace'; ctx.textAlign = 'center'
+        ctx.fillStyle = C.textDim
+        ctx.font = '800 11px "Barlow Condensed", monospace'
+        ctx.textAlign = 'center'
         ctx.fillText('LOG READINGS TO BUILD CHART', W / 2, H / 2)
         return
       }
@@ -75,17 +76,17 @@ function WindHistoryChart({ samples }) {
         const cardinal = { 0: 'N', 90: 'E', 180: 'S', 270: 'W', 360: 'N', 450: 'E', 540: 'S', 630: 'W' }
         const lbl = cardinal[((base % 360) + 360) % 360] || ''
         ctx.setLineDash([2, 4])
-        ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1
+        ctx.strokeStyle = C.sep; ctx.lineWidth = 1
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W - PAD_R, y); ctx.stroke()
         ctx.setLineDash([])
-        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '9px monospace'; ctx.textAlign = 'right'
+        ctx.fillStyle = C.textDim; ctx.font = '700 9px "Barlow Condensed", monospace'; ctx.textAlign = 'right'
         ctx.fillText(lbl, W - 2, y + 3)
       }
 
       if (recent.length >= 2) {
         ctx.beginPath()
         dirs.forEach((v, i) => { const x = toX(i), y = toY(v); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y) })
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5
+        ctx.strokeStyle = 'rgba(0,221,192,0.6)'; ctx.lineWidth = 1.5
         ctx.lineJoin = 'round'; ctx.stroke()
       }
 
@@ -93,25 +94,19 @@ function WindHistoryChart({ samples }) {
         const x = toX(i), y = toY(v)
         const isLast = i === dirs.length - 1
         ctx.beginPath()
-        ctx.arc(x, y, isLast ? 4.5 : 3, 0, Math.PI * 2)
-        ctx.fillStyle = isLast ? '#fff' : 'rgba(255,255,255,0.6)'
+        ctx.arc(x, y, isLast ? 4.5 : 2.5, 0, Math.PI * 2)
+        ctx.fillStyle = isLast ? C.cyan : 'rgba(0,221,192,0.5)'
         ctx.fill()
         if (isLast) {
-          ctx.font = '9px monospace'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.55)'
+          ctx.font = '700 9px "Barlow Condensed", monospace'; ctx.textAlign = 'center'
+          ctx.fillStyle = C.cyan
           ctx.fillText(`${recent[i].direction}°`, x, y - 8)
         }
       })
-
-      const t0 = recent[0].time, t1 = recent[recent.length - 1].time
-      const fmt = ms => { const m = Math.round((ms - t0) / 60_000); return m === 0 ? 'now' : `${m}m` }
-      ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = '8px monospace'
-      ctx.textAlign = 'left';  ctx.fillText(fmt(t0), 2, H - 2)
-      if (recent.length > 1) { ctx.textAlign = 'right'; ctx.fillText(fmt(t1), W - PAD_R - 2, H - 2) }
     }
 
     const ro = new ResizeObserver(draw)
-    ro.observe(container)
-    draw()
+    ro.observe(container); draw()
     return () => ro.disconnect()
   }, [samples])
 
@@ -124,10 +119,6 @@ function WindHistoryChart({ samples }) {
 
 export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
   const [draft, setDraft] = useState(() => manualTwd ?? 180)
-  const containerRef = useRef(null)
-  const [fs, setFs] = useState(80)
-  const [time, setTime] = useState('')
-
   const [boatPos, setBoatPos]     = useState(null)
   const [gpsError, setGpsError]   = useState(null)
   const [committee, setCommittee] = useState(() => {
@@ -138,11 +129,6 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
   })
 
   useEffect(() => {
-    const tick = () => setTime(new Date().toTimeString().slice(0, 8))
-    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
-  }, [])
-
-  useEffect(() => {
     if (!navigator.geolocation) { setGpsError('GPS not available'); return }
     const id = navigator.geolocation.watchPosition(
       pos => { setBoatPos({ lat: pos.coords.latitude, lon: pos.coords.longitude }); setGpsError(null) },
@@ -151,18 +137,6 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
     )
     return () => navigator.geolocation.clearWatch(id)
   }, [])
-
-  const draftText = `${String(draft).padStart(3, '0')}°`
-
-  useEffect(() => {
-    const el = containerRef.current; if (!el) return
-    const compute = () => {
-      const { clientWidth: W, clientHeight: H } = el
-      if (W && H) setFs(fitFontSize(draftText, W - 160, H * 0.75))
-    }
-    const ro = new ResizeObserver(compute); ro.observe(el); compute()
-    return () => ro.disconnect()
-  }, [draftText])
 
   function change(delta) {
     setDraft(d => ((d + delta) % 360 + 360) % 360)
@@ -187,143 +161,119 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
   }
 
   const lastLogged = samples.length ? samples[samples.length - 1] : null
+  const lineLength = committee && pin ? haversineDistance(committee, pin) : null
+
+  const draftText = `${draft}°`
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', background: C.bg }}>
 
-      <div style={{ flexShrink: 0, height: 36, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)' }}>RACE AREA</span>
-        <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>{time}</span>
-      </div>
-
-      <div ref={containerRef} style={{ flex: 2, minHeight: 0, background: '#fff', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <span style={{ position: 'absolute', top: 6, left: 10, fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.2em', color: 'rgba(0,0,0,0.4)' }}>
-          WIND DIRECTION (TWD)
-        </span>
-        <span style={{ position: 'absolute', top: 6, right: 10, fontSize: 11, fontFamily: 'monospace', color: 'rgba(0,0,0,0.35)' }}>
-          {compassLabel(draft)}
-        </span>
-
-        <button onPointerDown={() => change(-10)} style={adjBtn()}>−10</button>
-        <button onPointerDown={() => change(-1)}  style={adjBtn()}>−1</button>
-
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-          <span style={{ fontSize: fs, fontWeight: 900, fontFamily: 'monospace', color: '#000', lineHeight: 1, letterSpacing: '-0.02em' }}>
-            {draftText}
-          </span>
+      {/* Hero TWD card */}
+      <SL label="TRUE WIND DIRECTION" />
+      <div style={{ background: C.card, padding: '14px 14px 18px', flexShrink: 0 }}>
+        <div style={{ fontSize: 9, fontFamily: F.bc, fontWeight: 700, letterSpacing: '0.22em', color: C.textDim, textTransform: 'uppercase', marginBottom: 4 }}>
+          TWD  ·  {compassLabel(draft)}
         </div>
-
-        <button onPointerDown={() => change(+1)}  style={adjBtn()}>+1</button>
-        <button onPointerDown={() => change(+10)} style={adjBtn()}>+10</button>
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <span style={{ fontSize: 112, fontFamily: F.bc, fontWeight: 800, color: C.text, lineHeight: 0.88, letterSpacing: '-0.02em', textShadow: NUM_SHADOW }}>
+            {draft}
+          </span>
+          <span style={{ fontSize: 28, fontFamily: F.bc, fontWeight: 700, color: C.cyan, marginBottom: 14, marginLeft: 4 }}>°</span>
+        </div>
+        {lastLogged && (
+          <div style={{ marginTop: 6, fontSize: 11, fontFamily: F.bc, fontWeight: 600, color: C.textSub }}>
+            Last logged {Math.round((Date.now() - lastLogged.time) / 60000)}m ago · {lastLogged.direction}° · {samples.length} readings
+          </div>
+        )}
       </div>
 
-      <div style={{ flexShrink: 0, background: '#000', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.1)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+      {/* Adjustment buttons */}
+      <div style={{ padding: '10px 12px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: `1px solid ${C.sep}` }}>
+          {[[-10,'−10'],[-1,'−1'],[1,'+1'],[10,'+10']].map(([delta, label], i) => (
+            <button
+              key={delta}
+              onPointerDown={() => change(delta)}
+              style={{
+                flex: 1, height: 44, background: C.card,
+                border: 'none', borderRight: i < 3 ? `1px solid ${C.sep}` : 'none',
+                color: C.text, fontFamily: F.bc, fontWeight: 700, fontSize: 15,
+                cursor: 'pointer', letterSpacing: '0.03em',
+              }}
+            >{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Log button */}
+      <div style={{ padding: '0 12px 12px', flexShrink: 0 }}>
         <button
           onClick={() => logWindDir(draft)}
           style={{
-            flex: 1, padding: '14px 0',
-            background: '#fff', border: 'none', color: '#000',
-            fontFamily: 'monospace', fontWeight: 700, fontSize: 14,
-            letterSpacing: '0.18em', cursor: 'pointer',
+            width: '100%', padding: '14px 0',
+            background: C.cyanDim, border: `1px solid ${C.cyan}`, borderRadius: 6,
+            color: C.cyan, fontFamily: F.bc, fontWeight: 700,
+            fontSize: 14, letterSpacing: '0.18em', cursor: 'pointer',
           }}
         >LOG READING</button>
-        <div style={{ flexShrink: 0, textAlign: 'right' }}>
-          <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', letterSpacing: '0.1em' }}>LAST LOGGED</div>
-          <div style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 700, color: lastLogged ? '#fff' : 'rgba(255,255,255,0.2)' }}>
-            {lastLogged ? `${String(lastLogged.direction).padStart(3,'0')}°` : '—°'}
-          </div>
-          <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)' }}>
-            {samples.length > 0 ? `${samples.length} readings` : ''}
-          </div>
-        </div>
       </div>
 
-      {/* Start line ping section */}
-      <div style={{ flexShrink: 0, background: '#000', borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: 7 }}>
-        <LineEndRow
-          label="COMMITTEE"
-          pinged={!!committee}
-          noGps={!boatPos}
-          onPing={() => ping('committee')}
-          onReset={() => resetEnd('committee')}
-        />
-        <LineEndRow
-          label="PIN END"
-          pinged={!!pin}
-          noGps={!boatPos}
-          onPing={() => ping('pin')}
-          onReset={() => resetEnd('pin')}
-        />
-        {committee && pin && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 2 }}>
-            <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', width: 68, flexShrink: 0 }}>LINE LENGTH</span>
-            <span style={{ fontSize: 13, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>
-              {haversineDistance(committee, pin)} m
-            </span>
-          </div>
-        )}
-        {(gpsError || (!boatPos && !gpsError)) && (
-          <span style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.22)', marginTop: 1 }}>
+      {/* Start line section */}
+      <SL label="START LINE" right={lineLength ? `${lineLength}m` : undefined} />
+      {['committee','pin'].map(end => (
+        <div key={end} style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 14px', background: C.card,
+          borderBottom: `1px solid ${C.sep}`, flexShrink: 0,
+        }}>
+          <span style={{ flex: 1, fontSize: 11, fontFamily: F.bc, fontWeight: 700, letterSpacing: '0.15em', color: C.textSub, textTransform: 'uppercase' }}>
+            {end === 'committee' ? 'COMMITTEE' : 'PIN END'}
+            {(end === 'committee' ? committee : pin) && (
+              <span style={{ color: C.cyan, marginLeft: 8 }}>✓ SET</span>
+            )}
+          </span>
+          <button
+            onClick={() => ping(end)}
+            disabled={!boatPos}
+            style={{
+              padding: '8px 16px', borderRadius: 4,
+              background: (end === 'committee' ? committee : pin) ? C.cyanDim : 'transparent',
+              border: `1px solid ${!boatPos ? C.sep : C.cyan}`,
+              color: !boatPos ? C.textDim : C.cyan,
+              fontFamily: F.bc, fontWeight: 700, fontSize: 11,
+              letterSpacing: '0.12em', cursor: !boatPos ? 'default' : 'pointer',
+            }}
+          >PING</button>
+          <button
+            onClick={() => resetEnd(end)}
+            disabled={!(end === 'committee' ? committee : pin)}
+            style={{
+              padding: '8px 14px', borderRadius: 4,
+              background: 'transparent',
+              border: `1px solid ${(end === 'committee' ? committee : pin) ? C.sep : 'transparent'}`,
+              color: (end === 'committee' ? committee : pin) ? C.textSub : C.sep,
+              fontFamily: F.bc, fontWeight: 700, fontSize: 11,
+              letterSpacing: '0.1em', cursor: 'pointer',
+            }}
+          >RESET</button>
+        </div>
+      ))}
+
+      {(gpsError || (!boatPos && !gpsError)) && (
+        <div style={{ padding: '6px 14px', flexShrink: 0 }}>
+          <span style={{ fontSize: 10, fontFamily: F.bc, fontWeight: 600, color: C.textDim }}>
             {gpsError ? `GPS: ${gpsError}` : 'Acquiring GPS…'}
           </span>
-        )}
+        </div>
+      )}
+
+      {/* Wind history chart */}
+      <SL label="TWD HISTORY" right="LAST 35 MIN" />
+      <div style={{ height: 90, background: C.cardAlt, flexShrink: 0 }}>
+        <WindHistoryChart samples={samples} />
       </div>
 
-      <div style={{ flex: 3, minHeight: 0, background: '#000', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ flexShrink: 0, padding: '4px 0 0 10px', fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.3)' }}>
-          TWD HISTORY  (last 35 min)
-        </div>
-        <div style={{ flex: 1, minHeight: 0 }}>
-          <WindHistoryChart samples={samples} />
-        </div>
-      </div>
-
+      <div style={{ height: 16 }} />
     </div>
   )
-}
-
-function LineEndRow({ label, pinged, noGps, onPing, onReset }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', width: 68, flexShrink: 0 }}>
-        {label}
-        {pinged && <span style={{ color: 'rgba(255,255,255,0.55)', marginLeft: 4 }}>✓</span>}
-      </span>
-      <button
-        onClick={onPing}
-        disabled={noGps}
-        style={{
-          flex: 1, padding: '7px 0',
-          background: pinged ? 'rgba(255,255,255,0.12)' : 'transparent',
-          border: `1px solid rgba(255,255,255,${noGps ? 0.1 : pinged ? 0.45 : 0.22})`,
-          color: `rgba(255,255,255,${noGps ? 0.18 : pinged ? 0.85 : 0.55})`,
-          fontFamily: 'monospace', fontSize: 10, fontWeight: 700,
-          letterSpacing: '0.1em', cursor: noGps ? 'default' : 'pointer',
-        }}
-      >PING</button>
-      <button
-        onClick={onReset}
-        disabled={!pinged}
-        style={{
-          padding: '7px 14px', flexShrink: 0,
-          background: 'transparent',
-          border: `1px solid rgba(255,255,255,${!pinged ? 0.08 : 0.22})`,
-          color: `rgba(255,255,255,${!pinged ? 0.15 : 0.42})`,
-          fontFamily: 'monospace', fontSize: 10, fontWeight: 700,
-          letterSpacing: '0.08em', cursor: !pinged ? 'default' : 'pointer',
-        }}
-      >RESET</button>
-    </div>
-  )
-}
-
-function adjBtn() {
-  return {
-    height: '100%', width: 38, flexShrink: 0,
-    background: 'transparent', border: 'none',
-    borderRight: '1px solid rgba(0,0,0,0.15)',
-    borderLeft: '1px solid rgba(0,0,0,0.15)',
-    fontSize: 12, fontWeight: 700, fontFamily: 'monospace',
-    color: 'rgba(0,0,0,0.55)', cursor: 'pointer',
-  }
 }

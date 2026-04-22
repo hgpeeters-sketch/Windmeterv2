@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { C, F, NUM_SHADOW } from '../theme'
 
 function haversineDistance(p1, p2) {
   const toRad = d => d * Math.PI / 180
@@ -45,30 +46,22 @@ function fmt(s) {
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
 }
 
-const BG  = i => i % 2 === 0 ? '#000' : '#fff'
-const FG  = i => i % 2 === 0 ? '#fff' : '#000'
-const RGB = i => i % 2 === 0 ? '255,255,255' : '0,0,0'
-
-function fitFontSize(text, W, H, weight = '900') {
-  const canvas = document.createElement('canvas')
-  const ctx = canvas.getContext('2d')
-  let fs = Math.floor(H * 0.88)
-  while (fs > 20) {
-    ctx.font = `${weight} ${fs}px monospace`
-    if (ctx.measureText(text).width <= W - 8) break
-    fs -= 2
-  }
-  return fs
-}
+const SL = ({ label, right }) => (
+  <div style={{
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '7px 14px', borderBottom: `1px solid ${C.sep}`, flexShrink: 0,
+  }}>
+    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
+    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, color: C.textDim }}>{right}</span>}
+  </div>
+)
 
 export default function StartSequenceView({ wind, remaining, running, onStartStop, onReset, onSync }) {
-  const [time, setTime]       = useState('')
   const [boatPos, setBoatPos] = useState(null)
   const [notifPerm, setNotifPerm] = useState(() =>
     'Notification' in window ? Notification.permission : 'unsupported'
   )
 
-  // Read line ends from localStorage (set by RaceAreaView)
   const [committee] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sl_committee')) } catch { return null }
   })
@@ -76,18 +69,9 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
     try { return JSON.parse(localStorage.getItem('sl_pin')) } catch { return null }
   })
 
-  const countdownRef    = useRef(null)
-  const [countdownFs, setCountdownFs] = useState(100)
-  const distRef         = useRef(null)
-  const [distFs, setDistFs] = useState(60)
   const lastNotifDist   = useRef(null)
   const lastNotifTime   = useRef(0)
   const ocsNotifSent    = useRef(false)
-
-  useEffect(() => {
-    const tick = () => setTime(new Date().toTimeString().slice(0, 8))
-    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
-  }, [])
 
   useEffect(() => {
     if (!navigator.geolocation) return
@@ -109,34 +93,15 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
   const urgent        = remaining <= 60 && running
   const countdownText = started ? 'GO' : fmt(remaining)
 
-  useEffect(() => {
-    const el = countdownRef.current; if (!el) return
-    const compute = () => {
-      const { clientWidth: W, clientHeight: H } = el
-      if (W && H) setCountdownFs(fitFontSize(countdownText, W * 0.88, H * 0.48))
-    }
-    const ro = new ResizeObserver(compute); ro.observe(el); compute()
-    return () => ro.disconnect()
-  }, [countdownText])
+  // Progress: proportion of the current minute elapsed
+  const totalSecs = remaining % 60 || 60
+  const progress  = running ? (1 - (remaining % 60) / 60) : 0
 
-  const lineDist  = (boatPos && committee && pin) ? distToLine(boatPos, committee, pin) : null
+  const lineDist   = (boatPos && committee && pin) ? distToLine(boatPos, committee, pin) : null
   const lineLength = (committee && pin) ? haversineDistance(committee, pin) : null
-  const distText  = lineDist === null ? '—' : `${lineDist > 0 ? '+' : ''}${lineDist} m`
-  const isOCS     = lineDist !== null && lineDist > 0 && remaining <= 60 && running
+  const isOCS      = lineDist !== null && lineDist > 0 && remaining <= 60 && running
 
-  useEffect(() => {
-    const el = distRef.current; if (!el) return
-    const compute = () => {
-      const { clientWidth: W, clientHeight: H } = el
-      if (W && H) setDistFs(fitFontSize(distText, W * 0.88, H * 0.52))
-    }
-    const ro = new ResizeObserver(compute); ro.observe(el); compute()
-    return () => ro.disconnect()
-  }, [distText])
-
-  // Push distance to watch via mirrored phone notification.
-  // tag:'line-dist' replaces the previous notification in place (no stacking).
-  // Fires when distance changes by ≥ 3 m AND at least 8 s have elapsed.
+  // Watch notification for line distance
   useEffect(() => {
     if (lineDist === null || notifPerm !== 'granted') return
     const now = Date.now()
@@ -148,14 +113,11 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
     try {
       new Notification('Start Line', {
         body: `${lineDist > 0 ? '+' : ''}${lineDist} m  ${lineDist > 0 ? '▲ OVER LINE' : '▼ BEHIND LINE'}`,
-        tag: 'line-dist',
-        renotify: true,
-        silent: true,
+        tag: 'line-dist', renotify: true, silent: true,
       })
     } catch {}
   }, [lineDist, notifPerm])
 
-  // OCS alert: fires once when entering OCS state, rearms when cleared
   useEffect(() => {
     if (!isOCS) { ocsNotifSent.current = false; return }
     if (ocsNotifSent.current || notifPerm !== 'granted') return
@@ -163,9 +125,7 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
     try {
       new Notification('⚠ OCS', {
         body: `+${lineDist} m over the line — ${remaining}s to go`,
-        tag: 'ocs-alert',
-        renotify: true,
-        silent: false,
+        tag: 'ocs-alert', renotify: true, silent: false,
       })
     } catch {}
   }, [isOCS, notifPerm])
@@ -178,116 +138,121 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
     biasEnd  = lineBias > 0 ? 'PIN' : 'COMM'
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+  const timerColor = started ? C.textDim : urgent ? '#ff4444' : C.text
 
-      <div style={{ flex: 1, minHeight: 0, background: BG(0), display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)' }}>START SEQUENCE</span>
-        <span style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>{time}</span>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', background: C.bg }}>
+
+      {/* Countdown timer */}
+      <div style={{ background: C.card, padding: '14px 14px 8px', flexShrink: 0 }}>
+        <div style={{ fontSize: 9, fontFamily: F.bc, fontWeight: 700, letterSpacing: '0.22em', color: C.textDim, textTransform: 'uppercase', marginBottom: 4 }}>
+          START TIMER
+        </div>
+        <div style={{ fontSize: 96, fontFamily: F.bc, fontWeight: 800, color: timerColor, lineHeight: 0.9, letterSpacing: '-0.02em', textShadow: NUM_SHADOW, fontVariantNumeric: 'tabular-nums' }}>
+          {countdownText}
+        </div>
+        {/* Progress bar */}
+        <div style={{ marginTop: 10, height: 3, background: C.sep, borderRadius: 2, overflow: 'hidden' }}>
+          {running && (
+            <div style={{
+              width: `${Math.min(100, ((60 - (remaining % 60 || 60)) / 60) * 100)}%`,
+              height: '100%',
+              background: urgent ? '#ff4444' : C.cyan,
+              borderRadius: 2,
+              transition: 'width 1s linear',
+            }} />
+          )}
+        </div>
       </div>
 
-      <div ref={countdownRef} style={{ flex: 3, minHeight: 0, background: BG(1), display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 14 }}>
-        <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(1)},0.35)` }}>COUNTDOWN</span>
-        <span style={{
-          fontSize: countdownFs, fontWeight: 900, fontFamily: 'monospace',
-          color: started ? `rgba(${RGB(1)},0.3)` : FG(1),
-          lineHeight: 1, fontVariantNumeric: 'tabular-nums',
-          letterSpacing: urgent ? '0.05em' : '-0.02em',
-        }}>
-          {countdownText}
-        </span>
-        <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
-          <Btn onClick={onStartStop} primary={!running && !started} fg={FG(1)} rgb={RGB(1)}>
-            {running ? 'PAUSE' : started ? 'DONE' : 'START'}
-          </Btn>
-          <Btn onClick={onReset} fg={FG(1)} rgb={RGB(1)}>RESET</Btn>
-          <Btn onClick={onSync}  fg={FG(1)} rgb={RGB(1)}>SYNC</Btn>
-        </div>
+      {/* Control buttons */}
+      <div style={{ display: 'flex', borderBottom: `1px solid ${C.sep}`, flexShrink: 0 }}>
+        {[
+          { label: running ? 'PAUSE' : started ? 'DONE' : 'START', primary: !running && !started, action: onStartStop },
+          { label: 'RESET', action: onReset },
+          { label: 'SYNC', action: onSync },
+        ].map(({ label, primary, action }, i) => (
+          <button key={i} onClick={action} style={{
+            flex: 1, padding: '15px 0',
+            background: primary ? C.cyanDim : 'transparent',
+            border: 'none',
+            borderRight: i < 2 ? `1px solid ${C.sep}` : 'none',
+            color: primary ? C.cyan : C.textSub,
+            fontFamily: F.bc, fontWeight: 700, fontSize: 13,
+            letterSpacing: '0.15em', cursor: 'pointer',
+          }}>{label}</button>
+        ))}
       </div>
 
       {/* Distance to line */}
-      <div ref={distRef} style={{
-        flex: 3, minHeight: 0,
-        background: isOCS ? '#1e0000' : BG(2),
-        display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 14px', gap: 6,
+      <SL
+        label={lineLength ? `DISTANCE · LINE ${lineLength}m` : 'DISTANCE TO START LINE'}
+        right={isOCS ? '⚠ OCS' : notifPerm === 'granted' ? '⌚ WATCH ON' : undefined}
+      />
+      <div style={{
+        background: isOCS ? '#120000' : C.card,
+        padding: '14px 14px 18px',
+        flexShrink: 0,
         transition: 'background 0.3s',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: isOCS ? 'rgba(255,80,80,0.7)' : `rgba(${RGB(2)},0.4)` }}>
-            DISTANCE TO START LINE{lineLength !== null ? `  ·  LINE ${lineLength} m` : ''}
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <span style={{
+            fontSize: 72, fontFamily: F.bc, fontWeight: 800, lineHeight: 0.9, letterSpacing: '-0.02em',
+            color: isOCS ? '#ff3333' : lineDist === null ? C.textDim : lineDist > 0 ? C.text : C.textSub,
+            textShadow: NUM_SHADOW,
+          }}>
+            {lineDist === null ? '—' : `${lineDist > 0 ? '+' : ''}${lineDist}`}
           </span>
-          {notifPerm === 'default' && !isOCS && (
-            <button onClick={requestNotifPermission} style={{
-              padding: '3px 8px', background: 'transparent',
-              border: `1px solid rgba(${RGB(2)},0.25)`,
-              color: `rgba(${RGB(2)},0.5)`,
-              fontFamily: 'monospace', fontSize: 9, fontWeight: 700,
-              letterSpacing: '0.08em', cursor: 'pointer',
-            }}>WATCH ⌚</button>
-          )}
-          {notifPerm === 'granted' && !isOCS && (
-            <span style={{ fontSize: 9, fontFamily: 'monospace', color: `rgba(${RGB(2)},0.35)`, letterSpacing: '0.08em' }}>⌚ WATCH ON</span>
-          )}
-          {isOCS && (
-            <span style={{ fontSize: 13, fontFamily: 'monospace', fontWeight: 700, color: '#ff4444', letterSpacing: '0.2em' }}>⚠ OCS</span>
+          {lineDist !== null && (
+            <span style={{ fontSize: 22, fontFamily: F.bc, fontWeight: 700, color: isOCS ? '#ff3333' : C.cyan, marginBottom: 8, marginLeft: 6 }}>m</span>
           )}
         </div>
-        <span style={{
-          fontSize: distFs, fontWeight: 900, fontFamily: 'monospace', lineHeight: 1,
-          color: isOCS ? '#ff3333'
-            : lineDist === null ? `rgba(${RGB(2)},0.2)`
-            : lineDist > 0 ? FG(2) : `rgba(${RGB(2)},0.65)`,
-          letterSpacing: '-0.02em',
-        }}>
-          {distText}
-        </span>
         {lineDist !== null && (
-          <span style={{ fontSize: 11, fontFamily: 'monospace', color: isOCS ? 'rgba(255,80,80,0.7)' : `rgba(${RGB(2)},0.5)` }}>
+          <div style={{ marginTop: 6, fontSize: 11, fontFamily: F.bc, fontWeight: 600, color: isOCS ? 'rgba(255,80,80,0.7)' : C.textSub }}>
             {lineDist > 0 ? 'OVER LINE' : 'BEHIND LINE'}
-          </span>
+          </div>
         )}
         {lineDist === null && (
-          <span style={{ fontSize: 10, fontFamily: 'monospace', color: `rgba(${RGB(2)},0.25)`, letterSpacing: '0.08em' }}>
+          <div style={{ marginTop: 6, fontSize: 11, fontFamily: F.bc, fontWeight: 600, color: C.textDim, letterSpacing: '0.08em' }}>
             PING BOTH ENDS IN AREA TAB
-          </span>
+          </div>
+        )}
+        {notifPerm === 'default' && (
+          <button onClick={requestNotifPermission} style={{
+            marginTop: 10, padding: '7px 14px',
+            background: 'transparent', border: `1px solid ${C.sep}`, borderRadius: 4,
+            color: C.textSub, fontFamily: F.bc, fontWeight: 700, fontSize: 10,
+            letterSpacing: '0.1em', cursor: 'pointer',
+          }}>ENABLE WATCH NOTIFICATIONS ⌚</button>
         )}
       </div>
 
-      <div style={{ flex: 2, minHeight: 0, background: BG(3), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 14px', gap: 6 }}>
-        <span style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.2em', color: `rgba(${RGB(3)},0.4)` }}>LINE BIAS</span>
+      {/* Line bias */}
+      <SL label="LINE BIAS" />
+      <div style={{ background: C.card, padding: '14px 14px 18px', flexShrink: 0 }}>
         {lineBias !== null ? (
           <>
-            <span style={{ fontSize: 'clamp(36px, 8vh, 64px)', fontWeight: 900, fontFamily: 'monospace', color: FG(3), lineHeight: 1, letterSpacing: '-0.02em' }}>
-              {biasEnd} {Math.abs(lineBias).toFixed(1)}°
-            </span>
-            <span style={{ fontSize: 11, fontFamily: 'monospace', color: `rgba(${RGB(3)},0.5)` }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <span style={{ fontSize: 56, fontFamily: F.bc, fontWeight: 800, color: C.text, lineHeight: 0.9, textShadow: NUM_SHADOW }}>
+                {biasEnd}
+              </span>
+              <span style={{ fontSize: 22, fontFamily: F.bc, fontWeight: 700, color: C.cyan, marginBottom: 6, marginLeft: 10 }}>
+                {Math.abs(lineBias).toFixed(1)}°
+              </span>
+            </div>
+            <div style={{ marginTop: 6, fontSize: 12, fontFamily: F.bc, fontWeight: 600, color: C.textSub }}>
               {biasEnd === 'PIN' ? 'Port / pin end favoured' : 'Starboard / committee end favoured'}
               {Math.abs(lineBias) < 2 ? ' — nearly square' : Math.abs(lineBias) >= 10 ? ' — strongly' : ''}
-            </span>
+            </div>
           </>
         ) : (
-          <span style={{ fontSize: 12, fontFamily: 'monospace', color: `rgba(${RGB(3)},0.25)`, letterSpacing: '0.08em' }}>
+          <div style={{ fontSize: 11, fontFamily: F.bc, fontWeight: 600, color: C.textDim, letterSpacing: '0.08em' }}>
             PING BOTH ENDS TO CALCULATE
-          </span>
+          </div>
         )}
       </div>
 
+      <div style={{ height: 16 }} />
     </div>
   )
 }
-
-function Btn({ children, onClick, primary, fg, rgb }) {
-  return (
-    <button onClick={onClick} style={{
-      padding: '14px 22px',
-      background: primary ? FG_from(rgb) : 'transparent',
-      border: `1px solid rgba(${rgb},0.35)`,
-      color: primary ? BG_from(rgb) : `rgba(${rgb},0.8)`,
-      fontFamily: 'monospace', fontWeight: 700, fontSize: 14,
-      letterSpacing: '0.1em', cursor: 'pointer', minWidth: 90,
-    }}>{children}</button>
-  )
-}
-
-function FG_from(rgb) { return rgb === '0,0,0' ? '#000' : '#fff' }
-function BG_from(rgb) { return rgb === '0,0,0' ? '#fff' : '#000' }
