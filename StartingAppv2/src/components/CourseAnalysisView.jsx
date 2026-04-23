@@ -197,8 +197,8 @@ export default function CourseAnalysisView({ wind, samples }) {
         <div style={{ fontSize: 9, fontFamily: F.bc, fontWeight: 700, letterSpacing: '0.22em', color: C.textDim, textTransform: 'uppercase', marginBottom: 4 }}>
           MARK
         </div>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <span style={{ fontSize: 175, fontFamily: F.bc, fontWeight: 800, color: C.text, lineHeight: 0.88, letterSpacing: '-0.02em', textShadow: NUM_SHADOW }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 170, fontFamily: F.bc, fontWeight: 800, color: C.text, lineHeight: 0.88, letterSpacing: '-0.02em', textShadow: NUM_SHADOW }}>
             {mark}
           </span>
           <span style={{ fontSize: 28, fontFamily: F.bc, fontWeight: 700, color: C.cyan, marginLeft: 4 }}>°</span>
