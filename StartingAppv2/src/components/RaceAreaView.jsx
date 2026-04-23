@@ -18,11 +18,12 @@ function haversineDistance(p1, p2) {
 const SL = ({ label, right }) => (
   <div style={{
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '7px 14px', borderBottom: `1px solid ${C.sep}`,
+    padding: '5px 14px 3px', borderBottom: `1px solid ${C.sep}`,
+    background: C.cardAlt,
     flexShrink: 0,
   }}>
-    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
-    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, color: C.textDim }}>{right}</span>}
+    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, letterSpacing: '0.16em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
+    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, color: C.cyan }}>{right}</span>}
   </div>
 )
 
@@ -174,11 +175,11 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
         <div style={{ fontSize: 9, fontFamily: F.bc, fontWeight: 700, letterSpacing: '0.22em', color: C.textDim, textTransform: 'uppercase', marginBottom: 4 }}>
           TWD  ·  {compassLabel(draft)}
         </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-          <span style={{ fontSize: 112, fontFamily: F.bc, fontWeight: 800, color: C.text, lineHeight: 0.88, letterSpacing: '-0.02em', textShadow: NUM_SHADOW }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 170, fontFamily: F.bc, fontWeight: 800, color: C.text, lineHeight: 0.88, letterSpacing: '-0.02em', textShadow: NUM_SHADOW }}>
             {draft}
           </span>
-          <span style={{ fontSize: 28, fontFamily: F.bc, fontWeight: 700, color: C.cyan, marginBottom: 14, marginLeft: 4 }}>°</span>
+          <span style={{ fontSize: 28, fontFamily: F.bc, fontWeight: 700, color: C.cyan, marginLeft: 4 }}>°</span>
         </div>
         {lastLogged && (
           <div style={{ marginTop: 6, fontSize: 11, fontFamily: F.bc, fontWeight: 600, color: C.textSub }}>
@@ -195,9 +196,9 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
               key={delta}
               onPointerDown={() => change(delta)}
               style={{
-                flex: 1, height: 44, background: C.card,
+                flex: 1, height: 56, background: C.card,
                 border: 'none', borderRight: i < 3 ? `1px solid ${C.sep}` : 'none',
-                color: C.text, fontFamily: F.bc, fontWeight: 700, fontSize: 15,
+                color: C.text, fontFamily: F.bc, fontWeight: 700, fontSize: 25,
                 cursor: 'pointer', letterSpacing: '0.03em',
               }}
             >{label}</button>
@@ -210,10 +211,10 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
         <button
           onClick={() => logWindDir(draft)}
           style={{
-            width: '100%', padding: '14px 0',
+            width: '100%', padding: '20px 0',
             background: C.cyanDim, border: `1px solid ${C.cyan}`, borderRadius: 6,
             color: C.cyan, fontFamily: F.bc, fontWeight: 700,
-            fontSize: 14, letterSpacing: '0.18em', cursor: 'pointer',
+            fontSize: 30, letterSpacing: '0.18em', cursor: 'pointer',
           }}
         >LOG READING</button>
       </div>
@@ -269,7 +270,7 @@ export default function RaceAreaView({ manualTwd, logWindDir, samples }) {
 
       {/* Wind history chart */}
       <SL label="TWD HISTORY" right="LAST 35 MIN" />
-      <div style={{ height: 90, background: C.cardAlt, flexShrink: 0 }}>
+      <div style={{ flex: 1, minHeight: 90, background: C.cardAlt }}>
         <WindHistoryChart samples={samples} />
       </div>
 

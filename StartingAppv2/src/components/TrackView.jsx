@@ -145,10 +145,11 @@ Direct sailing language. No intro fluff.`
 const SL = ({ label, right }) => (
   <div style={{
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '7px 14px', borderBottom: `1px solid ${C.sep}`, flexShrink: 0,
+    padding: '5px 14px 3px', borderBottom: `1px solid ${C.sep}`,
+    background: C.cardAlt, flexShrink: 0,
   }}>
-    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
-    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, color: right.startsWith('●') ? '#ff4444' : C.textDim }}>{right}</span>}
+    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, letterSpacing: '0.16em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
+    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, color: right.startsWith('●') ? C.neg : C.cyan }}>{right}</span>}
   </div>
 )
 
@@ -260,15 +261,15 @@ export default function TrackView({ remaining, twd, samples }) {
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff4444' }} />
-              <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 13, color: '#ff4444', letterSpacing: '0.1em' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.neg }} />
+              <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 13, color: C.neg, letterSpacing: '0.1em' }}>
                 RECORDING · {pts.length} pts · {liveSpd?.toFixed(1) ?? '—'} kts
               </span>
             </div>
             <button onClick={stopRecording} style={{
               width: '100%', padding: '15px 0',
-              background: 'rgba(255,51,51,0.15)', border: '1px solid #ff4444', borderRadius: 6,
-              color: '#ff4444', fontFamily: F.bc, fontWeight: 700,
+              background: 'rgba(245,166,35,0.15)', border: `1px solid ${C.neg}`, borderRadius: 6,
+              color: C.neg, fontFamily: F.bc, fontWeight: 700,
               fontSize: 14, letterSpacing: '0.18em', cursor: 'pointer',
             }}>■ STOP RECORDING</button>
           </>
@@ -343,7 +344,8 @@ export default function TrackView({ remaining, twd, samples }) {
       {/* AI analysis */}
       {analysis && (
         <div style={{ background: C.card, margin: 0, flexShrink: 0 }}>
-          <div style={{ padding: '7px 14px', borderBottom: `1px solid ${C.sep}`, borderTop: `1px solid ${C.sep}` }}>
+          <div style={{ padding: '5px 14px 3px', borderBottom: `1px solid ${C.sep}`,
+    background: C.cardAlt, borderTop: `1px solid ${C.sep}` }}>
             <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim }}>AI RACE DEBRIEF</span>
           </div>
           <div style={{ padding: '14px', fontSize: 13, fontFamily: F.b, color: C.text, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>

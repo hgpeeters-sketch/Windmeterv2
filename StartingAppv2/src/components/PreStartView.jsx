@@ -11,10 +11,11 @@ function mpsToKnots(mps) { return mps * 1.94384 }
 const SL = ({ label, right }) => (
   <div style={{
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '7px 14px', borderBottom: `1px solid ${C.sep}`,
+    padding: '5px 14px 3px', borderBottom: `1px solid ${C.sep}`,
+    background: C.cardAlt,
   }}>
-    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
-    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.18em', color: C.textDim }}>{right}</span>}
+    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, letterSpacing: '0.16em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
+    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, color: C.cyan }}>{right}</span>}
   </div>
 )
 
@@ -214,7 +215,7 @@ export default function PreStartView() {
               }}>
                 <div style={{ fontSize: 9, fontFamily: F.bc, fontWeight: 700, letterSpacing: '0.22em', color: C.textDim, textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-                  <span style={{ fontSize: 54, fontFamily: F.bc, fontWeight: 800, color: C.text, lineHeight: 1, letterSpacing: '-0.02em', textShadow: NUM_SHADOW }}>
+                  <span style={{ fontSize: 50, fontFamily: F.bc, fontWeight: 800, color: C.text, lineHeight: 1, letterSpacing: '-0.02em', textShadow: NUM_SHADOW }}>
                     {val}
                   </span>
                   <span style={{ fontSize: 14, fontFamily: F.bc, fontWeight: 700, color: C.cyan, marginBottom: 6, marginLeft: 3 }}>{unit}</span>
@@ -225,7 +226,7 @@ export default function PreStartView() {
           </div>
 
           <SL label="SHIFT NEXT 12H" right="← LEFT / RIGHT →" />
-          <div style={{ height: 72, flexShrink: 0 }}>
+          <div style={{ height: 50, flexShrink: 0 }}>
             <ShiftChart hours={hours.slice(0, 12)} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 14px', flexShrink: 0 }}>
