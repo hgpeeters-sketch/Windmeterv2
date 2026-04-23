@@ -4,10 +4,11 @@ import { C, F, NUM_SHADOW } from '../theme'
 const SL = ({ label, right }) => (
   <div style={{
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '7px 14px', borderBottom: `1px solid ${C.sep}`, flexShrink: 0,
+    padding: '5px 14px 3px', borderBottom: `1px solid ${C.sep}`,
+    background: C.cardAlt, flexShrink: 0,
   }}>
-    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
-    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, color: C.textDim }}>{right}</span>}
+    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, letterSpacing: '0.16em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
+    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, color: C.cyan }}>{right}</span>}
   </div>
 )
 
@@ -71,6 +72,120 @@ function CogChart({ history }) {
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0 }} />
     </div>
+  )
+}
+
+function CompassArc({ cog }) {
+  const cx = 60, cy = 68, r = 56
+  const toSvgRad = b => (b - 90) * Math.PI / 180
+  const pt = (bearing, radius) => ({
+    x: cx + radius * Math.cos(toSvgRad(bearing)),
+    y: cy + radius * Math.sin(toSvgRad(bearing)),
+  })
+  const arcL = pt(270, r), arcR = pt(90, r)
+  const ticks = []
+  for (let b = 270; b <= 450; b += 22.5) {
+    const bearing = b % 360
+    const isMajor = bearing % 45 === 0
+    ticks.push({ inner: pt(bearing, r - (isMajor ? 9 : 5)), outer: pt(bearing, r), isMajor })
+  }
+  const cardinals = [
+    { label: 'W', b: 270 }, { label: 'NW', b: 315 }, { label: 'N', b: 0 },
+    { label: 'NE', b: 45 }, { label: 'E', b: 90 },
+  ]
+  const needleTip = cog !== null ? pt(cog, r - 10) : null
+  return (
+    <svg width={120} height={70} viewBox="0 0 120 70" style={{ display: 'block', overflow: 'hidden' }}>
+      <path d={`M ${arcL.x.toFixed(1)} ${arcL.y.toFixed(1)} A ${r} ${r} 0 0 0 ${arcR.x.toFixed(1)} ${arcR.y.toFixed(1)}`}
+        fill="none" stroke={C.sep} strokeWidth={1.5} />
+      {ticks.map(({ inner, outer, isMajor }, i) => (
+        <line key={i}
+          x1={inner.x.toFixed(1)} y1={inner.y.toFixed(1)}
+          x2={outer.x.toFixed(1)} y2={outer.y.toFixed(1)}
+          stroke={isMajor ? C.textDim : 'rgba(42,66,85,0.6)'} strokeWidth={isMajor ? 1.5 : 1}
+        />
+      ))}
+      {cardinals.map(({ label, b }) => {
+        const lp = pt(b, r - 18)
+        return (
+          <text key={label} x={lp.x.toFixed(1)} y={(lp.y + 3).toFixed(1)}
+            textAnchor="middle" fill={C.textDim}
+            fontFamily="'Barlow Condensed', sans-serif" fontSize={8} fontWeight={700}>
+            {label}
+          </text>
+        )
+      })}
+      {needleTip && (
+        <>
+          <line x1={cx} y1={cy} x2={needleTip.x.toFixed(1)} y2={needleTip.y.toFixed(1)}
+            stroke={C.cyan} strokeWidth={2.5} strokeLinecap="round" />
+          <circle cx={needleTip.x.toFixed(1)} cy={needleTip.y.toFixed(1)} r={3.5} fill={C.cyan} />
+        </>
+      )}
+      <circle cx={cx} cy={cy} r={3} fill={C.sep} />
+    </svg>
+  )
+}
+
+function RollGauge({ roll, rollActive }) {
+  const cx = 80, cy = 80, r = 68
+  const CLAMP = 45
+  const toSvgRad = angle => (angle - 90) * Math.PI / 180
+  const pt = (angle, radius) => ({
+    x: cx + radius * Math.cos(toSvgRad(angle)),
+    y: cy + radius * Math.sin(toSvgRad(angle)),
+  })
+  const rollDeg = roll !== null ? Math.max(-CLAMP, Math.min(CLAMP, roll)) : 0
+  const needleTip = pt(rollDeg, r - 12)
+  const isLevel = roll !== null && Math.abs(rollDeg) <= 1
+  const needleColor = !rollActive ? C.textDim : isLevel ? C.cyan : C.text
+  const gradMarks = [-45, -30, -20, -10, 0, 10, 20, 30, 45]
+  return (
+    <svg width={160} height={160} viewBox="0 0 160 160">
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.sep} strokeWidth={1.5} />
+      {gradMarks.map(deg => {
+        const isMajor = deg % 30 === 0 || deg === 0
+        const len = deg === 0 ? 14 : isMajor ? 10 : 6
+        const inner = pt(deg, r - len)
+        const outer = pt(deg, r)
+        return (
+          <line key={deg}
+            x1={inner.x.toFixed(1)} y1={inner.y.toFixed(1)}
+            x2={outer.x.toFixed(1)} y2={outer.y.toFixed(1)}
+            stroke={deg === 0 ? C.cyan : C.textDim}
+            strokeWidth={deg === 0 ? 2 : isMajor ? 1.5 : 1}
+          />
+        )
+      })}
+      {[-45, -30, 30, 45].map(deg => {
+        const lp = pt(deg, r - 22)
+        return (
+          <text key={deg} x={lp.x.toFixed(1)} y={(lp.y + 3).toFixed(1)}
+            textAnchor="middle" fill={C.textDim}
+            fontFamily="'Barlow Condensed', sans-serif" fontSize={9} fontWeight={700}>
+            {Math.abs(deg)}°
+          </text>
+        )
+      })}
+      {[[-90, 'PT'], [90, 'SB']].map(([deg, lbl]) => {
+        const lp = pt(deg, r - 14)
+        return (
+          <text key={lbl} x={lp.x.toFixed(1)} y={(lp.y + 3).toFixed(1)}
+            textAnchor="middle" fill={C.textDim}
+            fontFamily="'Barlow Condensed', sans-serif" fontSize={7} fontWeight={700}>
+            {lbl}
+          </text>
+        )
+      })}
+      {rollActive && roll !== null && (
+        <>
+          <line x1={cx} y1={cy} x2={needleTip.x.toFixed(1)} y2={needleTip.y.toFixed(1)}
+            stroke={needleColor} strokeWidth={3} strokeLinecap="round" />
+          <circle cx={needleTip.x.toFixed(1)} cy={needleTip.y.toFixed(1)} r={4} fill={needleColor} />
+        </>
+      )}
+      <circle cx={cx} cy={cy} r={5} fill={C.card} stroke={needleColor} strokeWidth={1.5} />
+    </svg>
   )
 }
 
@@ -200,15 +315,8 @@ export default function DashboardView({ wind }) {
           <div style={{ marginTop: 4, fontSize: 10, fontFamily: F.bc, fontWeight: 600, color: C.neg }}>{gpsError}</div>
         )}
       </div>
-      <div style={{ height: 70, background: C.cardAlt, flexShrink: 0 }}>
-        {cogHistory.length >= 2
-          ? <CogChart history={cogHistory} />
-          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 10, fontFamily: F.bc, fontWeight: 600, color: C.textDim, letterSpacing: '0.1em' }}>
-                {gpsError || 'COLLECTING COG DATA…'}
-              </span>
-            </div>
-        }
+      <div style={{ height: 80, background: C.cardAlt, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <CompassArc cog={cog} />
       </div>
 
       {/* Roll section */}
@@ -238,6 +346,9 @@ export default function DashboardView({ wind }) {
             {rollSide}
           </div>
         )}
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 14 }}>
+          <RollGauge roll={roll} rollActive={rollActive} />
+        </div>
       </div>
 
       <div style={{ height: 16 }} />

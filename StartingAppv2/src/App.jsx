@@ -9,12 +9,12 @@ import SettingsView from './components/SettingsView'
 import { C, F } from './theme'
 
 const TABS = [
-  { label: 'PRE',    short: 'PRE'   },
-  { label: 'AREA',   short: 'AREA'  },
-  { label: '+',      short: '+', isPlus: true },
-  { label: 'START',  short: 'START' },
-  { label: 'RACE',   short: 'RACE'  },
-  { label: 'TRACK',  short: 'TRACK' },
+  { label: 'PRE',    short: 'PRE'    },
+  { label: 'AREA',   short: 'AREA'   },
+  { label: 'COURSE', short: 'COURSE' },
+  { label: 'START',  short: 'START'  },
+  { label: 'RACE',   short: 'RACE'   },
+  { label: 'TRACK',  short: 'TRACK'  },
 ]
 
 const getTotal = () => parseInt(localStorage.getItem('timerMinutes') || '5') * 60
@@ -43,18 +43,6 @@ function App() {
   const [showIosHint, setShowIosHint] = useState(false)
   const [manualTwd, setManualTwd] = useState(loadTwd)
   const [manualSamples, setManualSamples] = useState(loadSamples)
-  const [clock, setClock] = useState('')
-
-  useEffect(() => {
-    const tick = () => {
-      const d = new Date()
-      const h = String(d.getHours()).padStart(2, '0')
-      const m = String(d.getMinutes()).padStart(2, '0')
-      const s = String(d.getSeconds()).padStart(2, '0')
-      setClock(`${h}:${m}:${s}`)
-    }
-    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
-  }, [])
 
   function logWindDir(dir) {
     const now = Date.now()
@@ -217,18 +205,41 @@ function App() {
     }}>
       {/* Header bar */}
       <div style={{
-        height: 34, flexShrink: 0,
+        flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        paddingLeft: 14, paddingRight: 10,
+        padding: '5px 14px',
         borderBottom: `1px solid ${C.sep}`,
-        background: C.bg,
+        background: C.card,
       }}>
-        <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, letterSpacing: '0.25em', color: C.cyan, textTransform: 'uppercase' }}>
+        <span style={{ fontFamily: F.bc, fontWeight: 800, fontSize: 15, letterSpacing: '0.2em', color: C.cyan, textTransform: 'uppercase' }}>
           {tabLabel}
         </span>
-        <span style={{ fontFamily: F.bc, fontWeight: 600, fontSize: 12, color: C.textDim, letterSpacing: '0.08em' }}>
-          {clock}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span title={wakeLockOn ? 'Screen on' : 'Screen lock inactive'} style={{
+            fontSize: 6, color: wakeLockOn ? C.cyan : C.sep, lineHeight: 1,
+          }}>●</span>
+          <button
+            onClick={toggleFullscreen}
+            style={{
+              width: 26, height: 28,
+              background: 'none', border: 'none',
+              color: isStandalone ? C.sep : C.textDim,
+              fontSize: isIOS ? 11 : 13,
+              cursor: isStandalone ? 'default' : 'pointer',
+              padding: 0, fontFamily: 'monospace',
+            }}
+          >{isIOS ? (isStandalone ? '⊠' : '⛶') : (isFullscreen ? '⊠' : '⛶')}</button>
+          <button
+            onClick={() => setShowSettings(s => !s)}
+            style={{
+              width: 28, height: 28,
+              background: 'none', border: 'none',
+              color: showSettings ? C.cyan : C.textDim,
+              fontSize: 16, cursor: 'pointer', padding: 0,
+              fontFamily: 'monospace',
+            }}
+          >⚙</button>
+        </div>
       </div>
 
       {/* Content */}
@@ -256,69 +267,31 @@ function App() {
         )}
       </div>
 
-      {/* Separator */}
-      <div style={{ height: 1, background: C.sep, flexShrink: 0 }} />
-
       {/* Tab bar */}
-      <div style={{ display: 'flex', height: 46, flexShrink: 0, background: C.bg }}>
-        {TABS.map(({ short, isPlus }, i) => {
+      <div style={{ display: 'flex', height: 34, flexShrink: 0, background: C.card, borderTop: `1px solid ${C.sep}` }}>
+        {TABS.map(({ short }, i) => {
           const active = !showSettings && tab === i
           return (
             <button
               key={i}
               onClick={() => { setShowSettings(false); setTab(i) }}
               style={{
-                flex: isPlus ? 0.65 : 1,
-                background: C.bg,
+                flex: 1,
+                background: 'none',
                 border: 'none',
-                borderTop: `2px solid ${active ? C.cyan : 'transparent'}`,
                 borderRight: i < TABS.length - 1 ? `1px solid ${C.sep}` : 'none',
                 color: active ? C.cyan : C.textDim,
                 fontFamily: F.bc,
-                fontWeight: 700,
-                fontSize: isPlus ? 20 : 9,
-                letterSpacing: isPlus ? 0 : '0.12em',
+                fontWeight: active ? 800 : 700,
+                fontSize: 9,
+                letterSpacing: '0.14em',
                 cursor: 'pointer',
                 padding: 0,
-                lineHeight: isPlus ? '46px' : undefined,
+                textTransform: 'uppercase',
               }}
             >{short}</button>
           )
         })}
-
-        {/* Wake lock dot + gear + fullscreen */}
-        <div style={{
-          display: 'flex', alignItems: 'center',
-          borderLeft: `1px solid ${C.sep}`,
-          borderTop: `2px solid ${showSettings ? C.cyan : 'transparent'}`,
-          flexShrink: 0,
-        }}>
-          <span title={wakeLockOn ? 'Screen on' : 'Screen lock inactive'} style={{
-            width: 16, textAlign: 'center', fontSize: 6,
-            color: wakeLockOn ? C.cyan : C.sep,
-          }}>●</span>
-          <button
-            onClick={() => setShowSettings(s => !s)}
-            style={{
-              width: 28, height: '100%',
-              background: C.bg, border: 'none',
-              color: showSettings ? C.cyan : C.textDim,
-              fontSize: 15, cursor: 'pointer', padding: 0,
-              fontFamily: 'monospace',
-            }}
-          >⚙</button>
-          <button
-            onClick={toggleFullscreen}
-            style={{
-              width: 26, height: '100%',
-              background: C.bg, border: 'none',
-              color: isStandalone ? C.sep : C.textDim,
-              fontSize: isIOS ? 11 : 13,
-              cursor: isStandalone ? 'default' : 'pointer',
-              padding: 0, fontFamily: 'monospace',
-            }}
-          >{isIOS ? (isStandalone ? '⊠' : '⛶') : (isFullscreen ? '⊠' : '⛶')}</button>
-        </div>
       </div>
 
       {showIosHint && (

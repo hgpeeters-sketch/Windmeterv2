@@ -49,10 +49,11 @@ function fmt(s) {
 const SL = ({ label, right }) => (
   <div style={{
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '7px 14px', borderBottom: `1px solid ${C.sep}`, flexShrink: 0,
+    padding: '5px 14px 3px', borderBottom: `1px solid ${C.sep}`,
+    background: C.cardAlt, flexShrink: 0,
   }}>
-    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
-    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, color: C.textDim }}>{right}</span>}
+    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, letterSpacing: '0.16em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
+    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, color: C.cyan }}>{right}</span>}
   </div>
 )
 
@@ -138,7 +139,7 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
     biasEnd  = lineBias > 0 ? 'PIN' : 'COMM'
   }
 
-  const timerColor = started ? C.textDim : urgent ? '#ff4444' : C.text
+  const timerColor = started ? C.textDim : remaining <= 60 ? C.neg : remaining <= 120 ? 'rgba(245,166,35,0.65)' : C.text
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', background: C.bg }}>
@@ -148,8 +149,14 @@ export default function StartSequenceView({ wind, remaining, running, onStartSto
         <div style={{ fontSize: 9, fontFamily: F.bc, fontWeight: 700, letterSpacing: '0.22em', color: C.textDim, textTransform: 'uppercase', marginBottom: 4 }}>
           START TIMER
         </div>
-        <div style={{ fontSize: 96, fontFamily: F.bc, fontWeight: 800, color: timerColor, lineHeight: 0.9, letterSpacing: '-0.02em', textShadow: NUM_SHADOW, fontVariantNumeric: 'tabular-nums' }}>
-          {countdownText}
+        <div style={{ fontSize: 170, fontFamily: F.bc, fontWeight: 800, color: timerColor, lineHeight: 0.9, letterSpacing: '-0.02em', textShadow: NUM_SHADOW, fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'baseline' }}>
+          {started ? 'GO' : (
+            <>
+              <span>{countdownText.slice(0, 2)}</span>
+              <span style={{ opacity: 0.4 }}>:</span>
+              <span>{countdownText.slice(3)}</span>
+            </>
+          )}
         </div>
         {/* Progress bar */}
         <div style={{ marginTop: 10, height: 3, background: C.sep, borderRadius: 2, overflow: 'hidden' }}>

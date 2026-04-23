@@ -147,10 +147,11 @@ function CourseOscChart({ samples, mark }) {
 const SL = ({ label, right }) => (
   <div style={{
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '7px 14px', borderBottom: `1px solid ${C.sep}`, flexShrink: 0,
+    padding: '5px 14px 3px', borderBottom: `1px solid ${C.sep}`,
+    background: C.cardAlt, flexShrink: 0,
   }}>
-    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, letterSpacing: '0.28em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
-    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 9, color: C.textDim }}>{right}</span>}
+    <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, letterSpacing: '0.16em', color: C.textDim, textTransform: 'uppercase' }}>{label}</span>
+    {right && <span style={{ fontFamily: F.bc, fontWeight: 700, fontSize: 11, color: C.cyan }}>{right}</span>}
   </div>
 )
 
@@ -197,7 +198,7 @@ export default function CourseAnalysisView({ wind, samples }) {
           MARK
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-          <span style={{ fontSize: 112, fontFamily: F.bc, fontWeight: 800, color: C.text, lineHeight: 0.88, letterSpacing: '-0.02em', textShadow: NUM_SHADOW }}>
+          <span style={{ fontSize: 175, fontFamily: F.bc, fontWeight: 800, color: C.text, lineHeight: 0.88, letterSpacing: '-0.02em', textShadow: NUM_SHADOW }}>
             {mark}
           </span>
           <span style={{ fontSize: 28, fontFamily: F.bc, fontWeight: 700, color: C.cyan, marginBottom: 14, marginLeft: 4 }}>°</span>
@@ -210,9 +211,9 @@ export default function CourseAnalysisView({ wind, samples }) {
               key={delta}
               onPointerDown={() => changeMark(delta)}
               style={{
-                flex: 1, height: 44, background: C.card,
+                flex: 1, height: 56, background: C.card,
                 border: 'none', borderRight: i < 3 ? `1px solid ${C.sep}` : 'none',
-                color: C.text, fontFamily: F.bc, fontWeight: 700, fontSize: 15,
+                color: C.text, fontFamily: F.bc, fontWeight: 700, fontSize: 25,
                 cursor: 'pointer',
               }}
             >{label}</button>
@@ -247,7 +248,7 @@ export default function CourseAnalysisView({ wind, samples }) {
 
       <SL label="FAVOURED SIDE" />
       <div style={{ background: C.card, padding: '16px 14px 20px', flexShrink: 0 }}>
-        <span style={{ fontSize: 80, fontFamily: F.bc, fontWeight: 800, color: favourColor, lineHeight: 0.9, letterSpacing: '-0.02em' }}>
+        <span style={{ fontSize: 64, fontFamily: F.bc, fontWeight: 800, color: favourColor, lineHeight: 0.9, letterSpacing: '-0.02em' }}>
           {favour}
         </span>
         {result && (
