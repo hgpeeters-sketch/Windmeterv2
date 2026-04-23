@@ -17,14 +17,20 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install & build web (Windmeterv2)
+        working-directory: web
+        run: npm ci && npm run build
+
       - name: Install & build StartingAppv2
         working-directory: StartingAppv2
         run: npm ci && npm run build
 
-      - name: Prepare deploy folder
+      - name: Merge dist folders
         run: |
           mkdir -p _deploy
-          cp -r StartingAppv2/dist/. _deploy/
+          cp -r web/dist/. _deploy/
+          mkdir -p _deploy/StartingAppv2
+          cp -r StartingAppv2/dist/. _deploy/StartingAppv2/
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3
